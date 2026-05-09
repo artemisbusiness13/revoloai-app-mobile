@@ -1,0 +1,43 @@
+{
+  "summary": "Iteration 5 (i18n full translation) — ALL critical test cases PASS. Backend: 30/30 pytest GREEN (8 new i18n chat + 22 iter3 regression). Frontend (mobile 390x844): home loads with no console/page errors, default English, exactly 2 lang chips (lang-en + lang-ro), tapping lang-ro instantly translates the entire UI to Romanian (hero, install button, sticky CTA 'Începe cu Sofia', 'Alege limba', trust title 'Construit să fie privat, sigur și al tău', pricing cards '3/5/10 joburi' + 'Cea mai bună ofertă' badge + 'Ia' button + 'De la', bundles 'Pachete inteligente' + 20%/35%/24% saves + 'Deblochează', how-it-works, account section 'Cont/Vizitator/Conectare/Achiziții/Joburi salvate', footer 'Politica de confidențialitate/Termeni/Cookie-uri/Ștergerea datelor'). Switching back to lang-en restores English. Selection persists across full page reload (AsyncStorage). /chat?avatar=sofia in RO mode shows header 'Antrenor interviuri', placeholder 'Mesaj pentru Sofia…', and Claude AI intro reply IS IN ROMANIAN ('Bună! Sunt Sofia, coach-ul tău AI de interviuri…'). /interview translated ('Interviu simulat', 'ÎNTREBAREA 1', 'Trimite răspunsul', placeholder 'Spune-ți răspunsul…'). /jobs translated ('Joburi potrivite', 'Salvează', 'Pregătire'). /checkout translated ('Plată', 'Metodă de plată', 'Card · Stripe', 'Plătește £8.99', 'Securizat de Stripe & PayPal'). /results radar axis labels translated (STAR, Claritate, Încredere, Profunzime, Structură) and section titles ('Defalcarea performanței', 'Sumar', 'Puncte forte', 'Îmbunătățiri', 'Pași următori'). Backend POST /api/chat with lang=Romanian for sofia/maya/aria all return Romanian replies; lang=English returns English; missing lang defaults to English; user-message follow-up in Romanian also returns Romanian.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "results.tsx legend pillboxes", "issue": "Per-axis legend labels under the radar chart are still in English ('Clarity 80, Confidence 88, Depth 88, Structure 80') even when lang=ro. The radar's axis labels (drawn on the SVG) ARE correctly translated, and the dictionary key results.axes.{clarity,confidence,content_depth,structure} exists in ro.ts. The legend appears to render the raw English keys instead of t('results.axes.<key>').", "testID": "n/a (legend pillboxes have no testID)", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "global", "issues": ["Pre-existing 'shadow*' style props deprecation warnings on web (cosmetic, non-blocking, carried over from iter4)"]}
+    ],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_i18n_chat.py",
+    "/app/test_reports/pytest/iter5_results.xml",
+    "/app/test_reports/pytest/iter5_iter3_regression.xml"
+  ],
+  "action_items": [
+    "(Low) results.tsx: translate the per-axis numeric legend labels (Clarity/Confidence/Depth/Structure → t('results.axes.clarity') etc). The radar SVG already translates them — only the legend pillboxes were missed.",
+    "(Optional, out of scope of iter5) Interview API (/interview/start and /interview/answer) does not accept a `lang` parameter. When a user runs a Romanian interview, the GPT-generated questions, feedback, and summary remain in English. If E1 wants the interview/results screens to be fully end-to-end Romanian, plumb the same `lang` directive into P.INTERVIEW_QUESTION_PROMPT / P.ANSWER_SCORING_PROMPT / P.INTERVIEW_SUMMARY_PROMPT.",
+    "(Carry-over from iter4, low) Expo doctor reports version drift on react-native-svg/async-storage/expo-linear-gradient — currently functional."
+  ],
+  "critical_code_review_comments": [
+    "i18n.tsx (~100 lines) is clean — uses React Context + AsyncStorage, has graceful SSR fallback to English, supports {var} interpolation and array lookup (tArr). DICTS map is easy to extend for future languages.",
+    "ro.ts/en.ts dictionaries use the same Translations interface from types.ts, so missing keys are caught by TS. Both files are ~240 lines, well within reasonable size.",
+    "server.py /api/chat correctly appends a LANGUAGE directive to the persona system prompt (line 167-170): 'Reply ONLY in {lang}. The user may speak any language; detect it but always respond in {lang}.' This is robust — verified working with avatars sofia/maya/aria for both English and Romanian.",
+    "Default lang fallback (line 166): `lang = (req.lang or 'English').strip() or 'English'` correctly handles None and empty string.",
+    "Minor: /api/interview/* endpoints do not accept a lang param. Mock-interview content (questions, scoring feedback, summary) is hard-coded English regardless of UI language. Out of scope for iter5 acceptance criteria but worth flagging."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_i18n_chat.py (NEW, 8 tests)",
+    "/app/test_reports/iteration_5.json (NEW)",
+    "/app/test_reports/pytest/iter5_results.xml (NEW)",
+    "/app/test_reports/pytest/iter5_iter3_regression.xml (NEW)"
+  ],
+  "success_rate": {"backend": "100% (30/30: 8 new i18n + 22 iter3 regression)", "frontend": "~98% — every required RO string verified on home/chat/interview/jobs/checkout/results; only the results.tsx per-axis legend pillboxes remain in English"},
+  "seed_data_creation": "Backend test users: TEST_lang_en_{sofia,maya,aria}, TEST_lang_ro_{sofia,maya,aria}, TEST_lang_default, TEST_lang_ro_followup. Each created 1 chat session via the Claude pipeline. iter3 regression also re-seeded TEST_iter3_user data. No production data touched.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Iter5 i18n acceptance is GREEN. Backend test files: /app/backend/tests/test_i18n_chat.py (8 tests, ~24s wall) + /app/backend/tests/test_iteration3.py (22 tests, ~27s wall). For UI smoke: open home → tap [data-testid='lang-ro'] → verify hero text is 'Găsește joburi mai bune.', then tap [data-testid='avatar-sofia'] → verify chat placeholder is 'Mesaj pentru Sofia…' and the Claude reply contains Romanian diacritics (5-7s wait). The only remaining UI gap is the per-axis legend pills on /results (Clarity/Confidence/Depth/Structure → Claritate/Încredere/Profunzime/Structură).",
+  "rca_of_issue": "N/A — no critical bugs. The single low-priority finding (results.tsx legend pillboxes in English) is likely because the legend renders score keys directly via something like `${k.replace('_',' ')}` instead of `t('results.axes.' + k)`. Fix: in /app/frontend/app/results.tsx find where the legend pillboxes render axis names and route through t() with the existing results.axes.* dictionary keys (star_coverage, clarity, confidence, content_depth, structure). Also note: scores shown in the screenshot ('Clarity 80, Confidence 88…') come from a stored interview generated in iter4 under English mode — so even after fixing the legend translation, summary BODY text and strengths/improvements arrays will still be English for that specific seed_id; new RO interviews will need backend/interview to plumb `lang` (separate optional action item)."
+}

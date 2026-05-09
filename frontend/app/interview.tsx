@@ -16,6 +16,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, api, getOrCreateUserId } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 const C_SOFIA = "#EC4899";
 
@@ -36,6 +37,7 @@ export default function InterviewScreen() {
   const [lastScore, setLastScore] = useState<Score | null>(null);
   const [starting, setStarting] = useState(true);
   const meta = AVATAR_META.sofia;
+  const { t } = useI18n();
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -95,11 +97,11 @@ export default function InterviewScreen() {
             <Avatar uri={AVATARS.sofia} size={36} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={st.hTitle}>Mock interview</Text>
+            <Text style={st.hTitle}>{t("interview.title")}</Text>
             <Text style={st.hSub}>{role} · {seniority}</Text>
           </View>
           <View style={st.progressBox}>
-            <Text style={st.progressText}>{current}/{total}</Text>
+            <Text style={st.progressText}>{t("interview.progress", { n: current, t: total })}</Text>
           </View>
         </View>
 
@@ -112,11 +114,11 @@ export default function InterviewScreen() {
             {starting ? (
               <View style={{ alignItems: "center", marginTop: 40 }}>
                 <ActivityIndicator color={C_SOFIA} />
-                <Text style={{ marginTop: 10, color: "#5B6577" }}>Sofia is preparing…</Text>
+                <Text style={{ marginTop: 10, color: "#5B6577" }}>{t("interview.preparing")}</Text>
               </View>
             ) : question ? (
               <Animated.View style={{ opacity: fade }}>
-                <Text style={st.qLabel}>QUESTION {current}</Text>
+                <Text style={st.qLabel}>{t("interview.questionLabel", { n: current })}</Text>
                 <Text style={st.qText}>{question.question}</Text>
                 <View style={st.qMetaRow}>
                   <View style={st.qBadge}><Text style={st.qBadgeText}>{question.category}</Text></View>
@@ -129,7 +131,7 @@ export default function InterviewScreen() {
               <View testID="last-score" style={st.scoreCard}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 }}>
                   <Ionicons name="checkmark-circle" size={16} color="#10B981" />
-                  <Text style={{ fontWeight: "800", color: "#0B0F19" }}>Quick feedback on last answer</Text>
+                  <Text style={{ fontWeight: "800", color: "#0B0F19" }}>{t("interview.quickFeedback")}</Text>
                 </View>
                 {!!lastScore.feedback && <Text style={{ color: "#5B6577", marginBottom: 8, lineHeight: 18 }}>{lastScore.feedback}</Text>}
                 <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
@@ -147,7 +149,7 @@ export default function InterviewScreen() {
             <TextInput
               testID="itv-answer"
               style={st.input}
-              placeholder="Speak your answer…"
+              placeholder={t("interview.placeholder")}
               placeholderTextColor="#8A93A6"
               multiline
               value={answer}
@@ -161,7 +163,7 @@ export default function InterviewScreen() {
             >
               {submitting ? <ActivityIndicator color="#fff" /> : (
                 <>
-                  <Text style={st.submitText}>Submit answer</Text>
+                  <Text style={st.submitText}>{t("interview.submit")}</Text>
                   <Ionicons name="arrow-forward" size={16} color="#fff" />
                 </>
               )}

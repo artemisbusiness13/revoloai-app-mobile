@@ -77,6 +77,7 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     user_id: Optional[str] = None
+    lang: Optional[str] = "English"
 
 
 class ChatResponse(BaseModel):
@@ -162,6 +163,11 @@ async def chat(req: ChatRequest):
         raise HTTPException(status_code=404, detail="Unknown avatar")
     persona = P.PERSONAS[avatar]
     session_id = req.session_id or str(uuid.uuid4())
+    lang = (req.lang or "English").strip() or "English"
+    lang_directive = (
+        f"\n\nLANGUAGE: Reply ONLY in {lang}. The user may speak any language; "
+        f"detect it but always respond in {lang}. Keep names and product terms in their original form."
+    )
 
     # load history
     sess = await db.chat_sessions.find_one({"session_id": session_id}, {"_id": 0})
@@ -182,7 +188,7 @@ async def chat(req: ChatRequest):
     if not req.message.strip() and not history:
         reply = await llm_svc.claude_chat(
             session_id=session_id,
-            system_prompt=persona["system"] + "\nGreet the user with a single warm sentence and ask one focused opening question.",
+            system_prompt=persona["system"] + lang_directive + "\nGreet the user with a single warm sentence and ask one focused opening question.",
             history=[],
             latest_user_message="Begin the conversation now.",
         )
@@ -191,7 +197,7 @@ async def chat(req: ChatRequest):
         history.append({"role": "user", "content": req.message.strip()})
         reply = await llm_svc.claude_chat(
             session_id=session_id,
-            system_prompt=persona["system"],
+            system_prompt=persona["system"] + lang_directive,
             history=history,
             latest_user_message=req.message.strip(),
         )

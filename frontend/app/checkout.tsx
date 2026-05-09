@@ -26,8 +26,10 @@ import {
   api,
   getOrCreateUserId,
 } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 export default function CheckoutScreen() {
+  const { t } = useI18n();
   const params = useLocalSearchParams<{
     avatar?: string;
     item_id?: string;
@@ -81,7 +83,7 @@ export default function CheckoutScreen() {
         if (r.status === "expired") {
           setPaying(false);
           setPollSession(null);
-          Alert.alert("Payment cancelled", "The checkout session expired.");
+          Alert.alert(t("checkout.cancelledTitle"), t("checkout.cancelledMsg"));
           return;
         }
       } catch {}
@@ -100,7 +102,7 @@ export default function CheckoutScreen() {
   const pay = async () => {
     if (paying || done) return;
     if (method === "paypal") {
-      Alert.alert("PayPal coming soon", "Use card (Stripe) for now — PayPal will be enabled when sandbox creds are set.");
+      Alert.alert(t("checkout.paypalSoonTitle"), t("checkout.paypalSoonMsg"));
       return;
     }
     setPaying(true);
@@ -126,7 +128,7 @@ export default function CheckoutScreen() {
         await Linking.openURL(r.url);
       }
     } catch (e: any) {
-      Alert.alert("Payment failed", e?.message || "Please try again.");
+      Alert.alert(t("checkout.payFailed"), e?.message || t("common.retry"));
       setPaying(false);
     }
   };
@@ -143,7 +145,7 @@ export default function CheckoutScreen() {
           <Pressable testID="checkout-close-btn" onPress={() => router.back()} style={styles.headerBtn} hitSlop={10}>
             <Ionicons name="close" size={22} color="#0B0F19" />
           </Pressable>
-          <Text style={styles.headerTitle}>Checkout</Text>
+          <Text style={styles.headerTitle}>{t("checkout.title")}</Text>
           <View style={{ width: 38 }} />
         </View>
 
@@ -171,13 +173,13 @@ export default function CheckoutScreen() {
               </View>
             ))}
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>One-time</Text>
+              <Text style={styles.priceLabel}>{t("checkout.oneTime")}</Text>
               <Text style={styles.price}>{item.price}</Text>
             </View>
           </View>
 
           {/* Method */}
-          <Text style={styles.sectionLabel}>Payment method</Text>
+          <Text style={styles.sectionLabel}>{t("checkout.paymentMethod")}</Text>
           <View style={styles.methods}>
             {(["stripe", "paypal"] as const).map((m) => (
               <Pressable
@@ -195,7 +197,7 @@ export default function CheckoutScreen() {
                   color={method === m ? meta.color : "#5B6577"}
                 />
                 <Text style={[styles.methodText, method === m && { color: meta.color }]}>
-                  {m === "stripe" ? "Card · Stripe" : "PayPal"}
+                  {m === "stripe" ? t("checkout.stripe") : t("checkout.paypal")}
                 </Text>
                 <View style={[styles.radio, method === m && { borderColor: meta.color }]}>
                   {method === m && <View style={[styles.radioInner, { backgroundColor: meta.color }]} />}
@@ -206,7 +208,7 @@ export default function CheckoutScreen() {
 
           <View style={styles.secureNote}>
             <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
-            <Text style={styles.secureText}>Secured by Stripe & PayPal · No card data stored.</Text>
+            <Text style={styles.secureText}>{t("checkout.secure")}</Text>
           </View>
         </ScrollView>
 
@@ -231,7 +233,7 @@ export default function CheckoutScreen() {
               ) : (
                 <>
                   <Ionicons name="lock-closed" size={16} color="#fff" />
-                  <Text style={styles.payBtnText}>Pay {item.price}</Text>
+                  <Text style={styles.payBtnText}>{t("checkout.pay", { price: item.price })}</Text>
                 </>
               )}
             </Pressable>
@@ -240,10 +242,10 @@ export default function CheckoutScreen() {
               <View style={[styles.successDot, { backgroundColor: "#10B981" }]}>
                 <Ionicons name="checkmark" size={18} color="#fff" />
               </View>
-              <Text style={styles.successTitle}>Payment confirmed</Text>
-              <Text style={styles.successSub}>Your session with {meta.name} is ready.</Text>
+              <Text style={styles.successTitle}>{t("checkout.confirmedTitle")}</Text>
+              <Text style={styles.successSub}>{t("checkout.confirmedSub", { name: t(`avatars.${key}.name`) })}</Text>
               <Pressable testID="start-session-btn" onPress={goChat} style={[styles.startBtn, { backgroundColor: meta.color }]}>
-                <Text style={styles.startBtnText}>Start session</Text>
+                <Text style={styles.startBtnText}>{t("checkout.startSession")}</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
               </Pressable>
             </Animated.View>

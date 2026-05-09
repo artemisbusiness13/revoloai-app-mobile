@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Svg, { Polygon, Polyline, Circle, Text as SvgText, Line } from "react-native-svg";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, api } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 const SOFIA = "#EC4899";
 const AXES = [
@@ -17,6 +18,7 @@ const AXES = [
 ] as const;
 
 export default function ResultsScreen() {
+  const { t } = useI18n();
   const params = useLocalSearchParams<{ interview_id?: string }>();
   const id = (params.interview_id as string) || "";
   const [data, setData] = useState<any>(null);
@@ -46,7 +48,8 @@ export default function ResultsScreen() {
 
   const summary = data?.summary;
   const overall = summary?.overall ?? Math.round(avgs.reduce((a, b) => a + b, 0) / Math.max(1, avgs.length));
-  const verdict = summary?.verdict || (overall >= 80 ? "Excellent" : overall >= 65 ? "Strong" : overall >= 50 ? "Promising" : "Needs work");
+  const rawVerdict = summary?.verdict || (overall >= 80 ? "Excellent" : overall >= 65 ? "Strong" : overall >= 50 ? "Promising" : "Needs work");
+  const verdict = t(`results.verdict.${rawVerdict}`);
 
   return (
     <View style={st.root}>
@@ -56,7 +59,7 @@ export default function ResultsScreen() {
           <Pressable testID="results-close" onPress={() => router.replace("/")} style={st.iconBtn} hitSlop={10}>
             <Ionicons name="close" size={22} color="#0B0F19" />
           </Pressable>
-          <Text style={st.hTitle}>Interview results</Text>
+          <Text style={st.hTitle}>{t("results.title")}</Text>
           <View style={{ width: 38 }} />
         </View>
 
@@ -77,14 +80,14 @@ export default function ResultsScreen() {
               </View>
               <View style={st.scoreCircle}>
                 <Text style={st.scoreText}>{overall}</Text>
-                <Text style={st.scoreLabel}>/100</Text>
+                <Text style={st.scoreLabel}>{t("results.overall")}</Text>
               </View>
             </View>
 
             {/* Radar */}
             <View style={st.card}>
-              <Text style={st.cardTitle}>Performance breakdown</Text>
-              <RadarChart values={avgs} labels={AXES.map((a) => a.label)} color={SOFIA} />
+              <Text style={st.cardTitle}>{t("results.breakdown")}</Text>
+              <RadarChart values={avgs} labels={AXES.map((a) => t(`results.axes.${a.key}`))} color={SOFIA} />
               <View style={st.legendRow}>
                 {AXES.map((a, i) => (
                   <View key={a.key} style={st.legendItem}>
@@ -98,21 +101,21 @@ export default function ResultsScreen() {
             {/* Summary */}
             {summary?.summary && (
               <View style={st.card}>
-                <Text style={st.cardTitle}>Summary</Text>
+                <Text style={st.cardTitle}>{t("results.summary")}</Text>
                 <Text style={st.body}>{summary.summary}</Text>
               </View>
             )}
 
             {/* Strengths / Improvements */}
             <View style={{ flexDirection: "row", gap: 10 }}>
-              <PillBox title="Strengths" items={summary?.top_strengths || []} color="#10B981" />
-              <PillBox title="Improvements" items={summary?.top_improvements || []} color="#F59E0B" />
+              <PillBox title={t("results.strengths")} items={summary?.top_strengths || []} color="#10B981" />
+              <PillBox title={t("results.improvements")} items={summary?.top_improvements || []} color="#F59E0B" />
             </View>
 
             {/* Next steps */}
             {!!summary?.next_steps?.length && (
               <View style={st.card}>
-                <Text style={st.cardTitle}>Next steps</Text>
+                <Text style={st.cardTitle}>{t("results.nextSteps")}</Text>
                 {summary.next_steps.map((n: string, i: number) => (
                   <View key={i} style={st.nextRow}>
                     <View style={st.nextDot}><Text style={st.nextDotText}>{i + 1}</Text></View>
@@ -123,7 +126,7 @@ export default function ResultsScreen() {
             )}
 
             <Pressable testID="results-restart" onPress={() => router.replace("/")} style={[st.primaryBtn, { backgroundColor: SOFIA }]}>
-              <Text style={st.primaryBtnText}>Done</Text>
+              <Text style={st.primaryBtnText}>{t("common.done")}</Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </Pressable>
           </ScrollView>

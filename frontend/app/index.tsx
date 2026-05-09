@@ -27,6 +27,7 @@ import {
   setUserName as saveUserName,
   clearUserName,
 } from "../lib/api";
+import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -175,6 +176,7 @@ type Plan = {
 };
 
 function ServiceCard({ plan, idx, onPress }: { plan: Plan; idx: number; onPress: (p: Plan) => void }) {
+  const { t } = useI18n();
   const isFeatured = !!plan.badge;
   return (
     <PressableCard
@@ -215,11 +217,11 @@ function ServiceCard({ plan, idx, onPress }: { plan: Plan; idx: number; onPress:
 
       <View style={styles.serviceFoot}>
         <View>
-          <Text style={styles.priceLabel}>From</Text>
+          <Text style={styles.priceLabel}>{t("services.from")}</Text>
           <Text style={styles.servicePrice}>{plan.price}</Text>
         </View>
         <View style={[styles.getBtn, { backgroundColor: plan.accent }]}>
-          <Text style={styles.getBtnText}>Get</Text>
+          <Text style={styles.getBtnText}>{t("services.get")}</Text>
           <Ionicons name="arrow-forward" size={14} color="#fff" />
         </View>
       </View>
@@ -306,145 +308,68 @@ function TrustCard({
 /* ---------- MAIN ---------- */
 export default function Home() {
   const insets = useSafeAreaInsets();
+  const { t, tArr, lang, setLang, langName } = useI18n();
   const scrollRef = useRef<ScrollView>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<"maya" | "sofia" | "aria">("sofia");
-  const [lang, setLang] = useState("English");
 
-  const langs = ["English", "Urdu", "Hindi", "Punjabi", "Bengali", "Romanian", "German", "Polish"];
+  // Built-in supported languages — extend SUPPORTED_LANGS to add more
+  const langs = SUPPORTED_LANGS;
+
+  const PRICES: Record<string, string> = {
+    "jobs-3": "£3.99", "jobs-5": "£6.99", "jobs-10": "£8.99",
+    "itv-basic": "£5.99", "itv-standard": "£8.99", "itv-advanced": "£13.99",
+    "coach-cv": "£7.99", "coach-answers": "£7.99", "coach-plan": "£11.99",
+  };
 
   const jobsPlans: Plan[] = [
-    {
-      id: "jobs-3",
-      avatar: "maya",
-      title: "3 jobs",
-      subtitle: "3 hand-picked roles matching your profile",
-      bullets: ["3 matched job results", "Match score per job", "Direct apply links"],
-      price: "£3.99",
-      accent: C.maya,
-      accentSoft: C.mayaSoft,
-    },
-    {
-      id: "jobs-5",
-      avatar: "maya",
-      title: "5 jobs",
-      subtitle: "5 curated roles + match scores",
-      bullets: ["5 curated job results", "Better comparison", "Priority matching"],
-      price: "£6.99",
-      accent: C.maya,
-      accentSoft: C.mayaSoft,
-    },
-    {
-      id: "jobs-10",
-      avatar: "maya",
-      title: "10 jobs",
-      subtitle: "10 deep-matched roles + insights",
-      bullets: ["10 job shortlist", "Best value search", "More options"],
-      price: "£8.99",
-      badge: "Best value",
-      accent: C.maya,
-      accentSoft: C.mayaSoft,
-    },
+    { id: "jobs-3",  avatar: "maya", title: t("plans.jobs-3.title"),  subtitle: t("plans.jobs-3.sub"),  bullets: tArr("plans.jobs-3.bullets"),  price: PRICES["jobs-3"],  accent: C.maya, accentSoft: C.mayaSoft },
+    { id: "jobs-5",  avatar: "maya", title: t("plans.jobs-5.title"),  subtitle: t("plans.jobs-5.sub"),  bullets: tArr("plans.jobs-5.bullets"),  price: PRICES["jobs-5"],  accent: C.maya, accentSoft: C.mayaSoft },
+    { id: "jobs-10", avatar: "maya", title: t("plans.jobs-10.title"), subtitle: t("plans.jobs-10.sub"), bullets: tArr("plans.jobs-10.bullets"), price: PRICES["jobs-10"], accent: C.maya, accentSoft: C.mayaSoft, badge: t("services.bestValue") },
   ];
 
   const interviewPlans: Plan[] = [
-    {
-      id: "itv-basic",
-      avatar: "sofia",
-      title: "Basic interview",
-      subtitle: "3 questions · quick warm-up",
-      bullets: ["3 interview questions", "Quick warm-up session", "Short feedback report"],
-      price: "£5.99",
-      accent: C.sofia,
-      accentSoft: C.sofiaSoft,
-    },
-    {
-      id: "itv-standard",
-      avatar: "sofia",
-      title: "Standard interview",
-      subtitle: "Full 6-question interview",
-      bullets: ["6 interview questions", "Score report included", "Improvement tips"],
-      price: "£8.99",
-      accent: C.sofia,
-      accentSoft: C.sofiaSoft,
-    },
-    {
-      id: "itv-advanced",
-      avatar: "sofia",
-      title: "Advanced interview",
-      subtitle: "10 questions + scored feedback",
-      bullets: ["10 interview questions", "Deep scored feedback", "Strong preparation"],
-      price: "£13.99",
-      badge: "Best value",
-      accent: C.sofia,
-      accentSoft: C.sofiaSoft,
-    },
+    { id: "itv-basic",    avatar: "sofia", title: t("plans.itv-basic.title"),    subtitle: t("plans.itv-basic.sub"),    bullets: tArr("plans.itv-basic.bullets"),    price: PRICES["itv-basic"],    accent: C.sofia, accentSoft: C.sofiaSoft },
+    { id: "itv-standard", avatar: "sofia", title: t("plans.itv-standard.title"), subtitle: t("plans.itv-standard.sub"), bullets: tArr("plans.itv-standard.bullets"), price: PRICES["itv-standard"], accent: C.sofia, accentSoft: C.sofiaSoft },
+    { id: "itv-advanced", avatar: "sofia", title: t("plans.itv-advanced.title"), subtitle: t("plans.itv-advanced.sub"), bullets: tArr("plans.itv-advanced.bullets"), price: PRICES["itv-advanced"], accent: C.sofia, accentSoft: C.sofiaSoft, badge: t("services.bestValue") },
   ];
 
   const coachPlans: Plan[] = [
-    {
-      id: "coach-cv",
-      avatar: "aria",
-      title: "CV review",
-      subtitle: "Detailed feedback on your CV",
-      bullets: ["Full CV analysis", "Improvement notes", "Better positioning"],
-      price: "£7.99",
-      accent: C.aria,
-      accentSoft: C.ariaSoft,
-    },
-    {
-      id: "coach-answers",
-      avatar: "aria",
-      title: "Answer suggestions",
-      subtitle: "Tailored answers to common questions",
-      bullets: ["Answer templates", "STAR structure guidance", "Confidence boost"],
-      price: "£7.99",
-      accent: C.aria,
-      accentSoft: C.ariaSoft,
-    },
-    {
-      id: "coach-plan",
-      avatar: "aria",
-      title: "Career plan",
-      subtitle: "12-month roadmap to your next role",
-      bullets: ["30-day action plan", "Skill gap analysis", "Clear next steps"],
-      price: "£11.99",
-      badge: "Best value",
-      accent: C.aria,
-      accentSoft: C.ariaSoft,
-    },
+    { id: "coach-cv",      avatar: "aria", title: t("plans.coach-cv.title"),      subtitle: t("plans.coach-cv.sub"),      bullets: tArr("plans.coach-cv.bullets"),      price: PRICES["coach-cv"],      accent: C.aria, accentSoft: C.ariaSoft },
+    { id: "coach-answers", avatar: "aria", title: t("plans.coach-answers.title"), subtitle: t("plans.coach-answers.sub"), bullets: tArr("plans.coach-answers.bullets"), price: PRICES["coach-answers"], accent: C.aria, accentSoft: C.ariaSoft },
+    { id: "coach-plan",    avatar: "aria", title: t("plans.coach-plan.title"),    subtitle: t("plans.coach-plan.sub"),    bullets: tArr("plans.coach-plan.bullets"),    price: PRICES["coach-plan"],    accent: C.aria, accentSoft: C.ariaSoft, badge: t("services.bestValue") },
   ];
 
   const bundles: { id: string; avatar: "maya" | "sofia" | "aria"; title: string; desc: string; bullets: string[]; price: string; save: string; g1: string; g2: string }[] = [
     {
       id: "bundle-starter",
       avatar: "maya",
-      title: "Job Hunt Starter",
-      desc: "5 jobs + Standard interview",
-      bullets: ["5 curated job results", "Standard mock interview", "Save 20% vs separate"],
+      title: t("bundles.bundle-starter.title"),
+      desc: t("bundles.bundle-starter.desc"),
+      bullets: tArr("bundles.bundle-starter.bullets"),
       price: "£11.99",
-      save: "Save 20%",
+      save: t("bundles.bundle-starter.save"),
       g1: "#5B5FE9",
       g2: "#7C8DFF",
     },
     {
       id: "bundle-pro",
       avatar: "sofia",
-      title: "Career Pro",
-      desc: "10 jobs + Advanced interview + CV review",
-      bullets: ["10 jobs + Advanced interview", "Full CV review included", "Save 35% vs separate"],
+      title: t("bundles.bundle-pro.title"),
+      desc: t("bundles.bundle-pro.desc"),
+      bullets: tArr("bundles.bundle-pro.bullets"),
       price: "£22.99",
-      save: "Save 35%",
+      save: t("bundles.bundle-pro.save"),
       g1: "#0F172A",
       g2: "#334155",
     },
     {
       id: "bundle-launch",
       avatar: "aria",
-      title: "Career Launch",
-      desc: "Career plan + 5 jobs + CV review",
-      bullets: ["Career plan + 5 jobs", "Full CV review included", "Save 24% vs separate"],
+      title: t("bundles.bundle-launch.title"),
+      desc: t("bundles.bundle-launch.desc"),
+      bullets: tArr("bundles.bundle-launch.bullets"),
       price: "£19.99",
-      save: "Save 24%",
+      save: t("bundles.bundle-launch.save"),
       g1: "#EC4899",
       g2: "#F472B6",
     },
@@ -581,21 +506,18 @@ export default function Home() {
   const handleInstall = async () => {
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
     if (Platform.OS === "web") {
-      Alert.alert(
-        "Install RevoloAI",
-        "Add to Home Screen via your browser's share menu. iOS: Share → Add to Home Screen. Android: Menu → Install app."
-      );
+      Alert.alert(t("install.title"), t("install.bodyWeb"));
       return;
     }
-    Alert.alert("You're already in the app", "RevoloAI is running as a native app.");
+    Alert.alert(t("install.nativeTitle"), t("install.bodyNative"));
   };
 
   const openTrust = (kind: "privacy" | "deletion" | "payments" | "honest") => {
     const map = {
-      privacy: { title: "Privacy Policy", body: "We process the minimum data needed to run RevoloAI. Your CV and chats are private and yours to delete anytime." },
-      deletion: { title: "Data Deletion", body: "Tap Delete in your account to wipe all stored data. Your right is honoured immediately." },
-      payments: { title: "Stripe & PayPal", body: "Payments are tokenised by Stripe and PayPal. We never see or store your card details." },
-      honest: { title: "Honest about results", body: "RevoloAI helps you find and prepare for opportunities, but does not guarantee employment, interviews, or job offers." },
+      privacy:  { title: t("trust.privacyTitle"),  body: t("trust.privacyBody") },
+      deletion: { title: t("trust.deletionTitle"), body: t("trust.deletionBody") },
+      payments: { title: t("trust.paymentsTitle"), body: t("trust.paymentsBody") },
+      honest:   { title: t("trust.honestTitle"),   body: t("trust.honestBody") },
     };
     setTrustModal(map[kind]);
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
@@ -660,7 +582,7 @@ export default function Home() {
           </View>
           <PressableCard testID="install-btn" onPress={handleInstall} style={styles.installBtn}>
             <Ionicons name="phone-portrait-outline" size={14} color={C.text} />
-            <Text style={styles.installBtnText}>Install</Text>
+            <Text style={styles.installBtnText}>{t("home.install")}</Text>
           </PressableCard>
         </View>
 
@@ -683,16 +605,16 @@ export default function Home() {
             />
             <View style={styles.earlyAccessPill}>
               <View style={[styles.pulseDot]} />
-              <Text style={styles.earlyAccessText}>Now in early access</Text>
+              <Text style={styles.earlyAccessText}>{t("home.earlyAccess")}</Text>
             </View>
 
             <Text style={styles.heroTitle}>
-              Find better jobs.{"\n"}
-              <Text style={{ color: C.primary }}>Practice interviews.</Text>
-              {"\n"}Get hired faster.
+              {t("home.heroTitle1")}{"\n"}
+              <Text style={{ color: C.primary }}>{t("home.heroTitle2")}</Text>
+              {"\n"}{t("home.heroTitle3")}
             </Text>
             <Text style={styles.heroSub}>
-              Your AI Career Assistant — three friendly avatars guide you from CV to offer.
+              {t("home.heroSub")}
             </Text>
 
             {/* Hero avatars row */}
@@ -707,8 +629,8 @@ export default function Home() {
                 <Avatar uri={AVATARS.aria } size={50} style={styles.heroAvatar} />
               </View>
               <View style={styles.heroAvatarsLabel}>
-                <Text style={styles.heroAvatarsTitle}>Start with your avatar</Text>
-                <Text style={styles.heroAvatarsSub}>Tap any card to explore</Text>
+                <Text style={styles.heroAvatarsTitle}>{t("home.startWithAvatar")}</Text>
+                <Text style={styles.heroAvatarsSub}>{t("home.tapToExplore")}</Text>
               </View>
             </View>
 
@@ -718,12 +640,12 @@ export default function Home() {
                 style={styles.primaryBtn}
                 onPress={scrollToAvatars}
               >
-                <Text style={styles.primaryBtnText}>Choose your avatar</Text>
+                <Text style={styles.primaryBtnText}>{t("home.chooseAvatar")}</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
               </PressableCard>
               <View style={styles.heroChip}>
                 <Ionicons name="cash-outline" size={14} color={C.emerald} />
-                <Text style={styles.heroChipText}>No subscription · Pay per use</Text>
+                <Text style={styles.heroChipText}>{t("home.noSubscription")}</Text>
               </View>
             </View>
           </View>
@@ -736,24 +658,24 @@ export default function Home() {
                   <Ionicons name="globe-outline" size={16} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.langTitle}>Choose your language</Text>
-                  <Text style={styles.langSub}>Instantly translate the app experience</Text>
+                  <Text style={styles.langTitle}>{t("lang.title")}</Text>
+                  <Text style={styles.langSub}>{t("lang.sub")}</Text>
                 </View>
               </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
                 {langs.map((l) => {
-                  const active = lang === l;
+                  const active = lang === l.code;
                   return (
                     <Pressable
-                      key={l}
-                      testID={`lang-${l}`}
+                      key={l.code}
+                      testID={`lang-${l.code}`}
                       onPress={() => {
-                        setLang(l);
+                        setLang(l.code as LangCode);
                         if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
                       }}
                       style={[styles.langChip, active && styles.langChipActive]}
                     >
-                      <Text style={[styles.langChipText, active && styles.langChipTextActive]}>{l}</Text>
+                      <Text style={[styles.langChipText, active && styles.langChipTextActive]}>{l.native}</Text>
                     </Pressable>
                   );
                 })}
@@ -763,42 +685,42 @@ export default function Home() {
 
           {/* TRUST */}
           <View style={styles.section}>
-            <SectionLabel label="Trust & safety" color={C.emerald} />
-            <SectionTitle>Built to be private, secure, and yours</SectionTitle>
+            <SectionLabel label={t("trust.label")} color={C.emerald} />
+            <SectionTitle>{t("trust.title")}</SectionTitle>
             <View style={styles.trustGrid}>
               <TrustCard
                 testID="trust-privacy" onPress={() => openTrust("privacy")}
                 icon="shield-checkmark-outline"
-                title="Privacy Policy"
-                tag="Policy"
-                cta="View details"
+                title={t("trust.privacyTitle")}
+                tag={t("trust.privacyTag")}
+                cta={t("trust.privacyCta")}
                 color={C.primary}
                 bg={C.primarySoft}
               />
               <TrustCard
                 testID="trust-deletion" onPress={() => openTrust("deletion")}
                 icon="trash-outline"
-                title="Data Deletion"
-                tag="Your right"
-                cta="Open"
+                title={t("trust.deletionTitle")}
+                tag={t("trust.deletionTag")}
+                cta={t("trust.deletionCta")}
                 color={C.sofia}
                 bg={C.sofiaSoft}
               />
               <TrustCard
                 testID="trust-payments" onPress={() => openTrust("payments")}
                 icon="card-outline"
-                title="Stripe & PayPal"
-                tag="Secure"
-                cta="See pricing"
+                title={t("trust.paymentsTitle")}
+                tag={t("trust.paymentsTag")}
+                cta={t("trust.paymentsCta")}
                 color={C.emerald}
                 bg={C.emeraldSoft}
               />
               <TrustCard
                 testID="trust-honest" onPress={() => openTrust("honest")}
                 icon="information-circle-outline"
-                title="No card data stored"
-                tag="No lock-in"
-                cta="Learn more"
+                title={t("trust.honestTitle")}
+                tag={t("trust.honestTag")}
+                cta={t("trust.honestCta")}
                 color={C.aria}
                 bg={C.ariaSoft}
               />
@@ -806,38 +728,38 @@ export default function Home() {
             <View style={styles.honestNote}>
               <Ionicons name="alert-circle-outline" size={14} color={C.text2} />
               <Text style={styles.honestNoteText}>
-                Revoloai helps you find and prepare for opportunities, but does not guarantee employment, interviews, or job offers.
+                {t("trust.note")}
               </Text>
             </View>
           </View>
 
           {/* MEET YOUR AVATARS */}
           <View style={styles.section} onLayout={(e) => (avatarsSectionY.current = e.nativeEvent.layout.y)}>
-            <SectionLabel label="Choose" color={C.primary} />
-            <SectionTitle>Meet your avatars</SectionTitle>
-            <SectionSub>Three friendly AIs, each with a clear role.</SectionSub>
+            <SectionLabel label={t("meetAvatars.label")} color={C.primary} />
+            <SectionTitle>{t("meetAvatars.title")}</SectionTitle>
+            <SectionSub>{t("meetAvatars.sub")}</SectionSub>
             <View style={styles.avatarRow}>
               <AvatarChip
                 testID="avatar-maya" onPress={() => openChat("maya")}
                 src={AVATARS.maya}
-                name="Maya"
-                role="Job Finder"
+                name={t("avatars.maya.name")}
+                role={t("avatars.maya.role")}
                 color={C.maya}
                 bg={C.mayaSoft}
               />
               <AvatarChip
                 testID="avatar-sofia" onPress={() => openChat("sofia")}
                 src={AVATARS.sofia}
-                name="Sofia"
-                role="Interview Coach"
+                name={t("avatars.sofia.name")}
+                role={t("avatars.sofia.role")}
                 color={C.sofia}
                 bg={C.sofiaSoft}
               />
               <AvatarChip
                 testID="avatar-aria" onPress={() => openChat("aria")}
                 src={AVATARS.aria}
-                name="Aria"
-                role="Career Coach"
+                name={t("avatars.aria.name")}
+                role={t("avatars.aria.role")}
                 color={C.aria}
                 bg={C.ariaSoft}
               />
@@ -851,9 +773,9 @@ export default function Home() {
                 <Avatar uri={AVATARS.maya } size={50} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <SectionLabel label="Job Finder · Maya" color={C.maya} />
-                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Get jobs that actually fit</Text>
-                <Text style={styles.sectionSub}>Maya scouts roles based on your profile and goals.</Text>
+                <SectionLabel label={t("services.mayaLabel")} color={C.maya} />
+                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>{t("services.mayaTitle")}</Text>
+                <Text style={styles.sectionSub}>{t("services.mayaSub")}</Text>
               </View>
             </View>
             <View style={styles.plansList}>
@@ -870,9 +792,9 @@ export default function Home() {
                 <Avatar uri={AVATARS.sofia } size={50} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <SectionLabel label="Interview Sim · Sofia" color={C.sofia} />
-                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Practice the interview</Text>
-                <Text style={styles.sectionSub}>Sofia runs realistic mock interviews for the role you want.</Text>
+                <SectionLabel label={t("services.sofiaLabel")} color={C.sofia} />
+                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>{t("services.sofiaTitle")}</Text>
+                <Text style={styles.sectionSub}>{t("services.sofiaSub")}</Text>
               </View>
             </View>
             <View style={styles.plansList}>
@@ -889,9 +811,9 @@ export default function Home() {
                 <Avatar uri={AVATARS.aria } size={50} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <SectionLabel label="Career Coach · Aria" color={C.aria} />
-                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>Plan your next move</Text>
-                <Text style={styles.sectionSub}>Aria reviews your CV, sharpens answers, maps your year.</Text>
+                <SectionLabel label={t("services.ariaLabel")} color={C.aria} />
+                <Text style={[styles.sectionTitle, { marginTop: 6 }]}>{t("services.ariaTitle")}</Text>
+                <Text style={styles.sectionSub}>{t("services.ariaSub")}</Text>
               </View>
             </View>
             <View style={styles.plansList}>
@@ -903,9 +825,9 @@ export default function Home() {
 
           {/* BUNDLES */}
           <View style={[styles.section, { paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.bundles = e.nativeEvent.layout.y)}>
-            <SectionLabel label="Save more" color={C.amber} />
-            <SectionTitle>Smart bundles</SectionTitle>
-            <SectionSub>Combine services and save up to 35%.</SectionSub>
+            <SectionLabel label={t("bundles.label")} color={C.amber} />
+            <SectionTitle>{t("bundles.title")}</SectionTitle>
+            <SectionSub>{t("bundles.sub")}</SectionSub>
             <View style={{ marginTop: 16, gap: 14 }}>
               {bundles.map((b, i) => (
                 <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={styles.bundleCard}>
@@ -931,7 +853,7 @@ export default function Home() {
                   <View style={styles.bundleFooter}>
                     <Text style={styles.bundlePrice}>{b.price}</Text>
                     <View style={styles.bundleCta}>
-                      <Text style={styles.bundleCtaText}>Unlock</Text>
+                      <Text style={styles.bundleCtaText}>{t("bundles.unlock")}</Text>
                       <Ionicons name="arrow-forward" size={14} color={b.g1} />
                     </View>
                   </View>
@@ -942,8 +864,8 @@ export default function Home() {
 
           {/* CONVERSATION DEMO */}
           <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28 }]}>
-            <SectionLabel label="Conversation" color={C.sofia} />
-            <SectionTitle>Talk like a real interview</SectionTitle>
+            <SectionLabel label={t("conversation.label")} color={C.sofia} />
+            <SectionTitle>{t("conversation.title")}</SectionTitle>
             <View style={styles.chatCard}>
               <View style={styles.chatHeader}>
                 <View style={[styles.personRing, { borderColor: C.sofia, width: 40, height: 40 }]}>
@@ -953,19 +875,19 @@ export default function Home() {
                   <Text style={styles.chatName}>Sofia</Text>
                   <View style={styles.chatStatus}>
                     <View style={[styles.pulseDot, { backgroundColor: C.emerald }]} />
-                    <Text style={styles.chatStatusText}>live · listening</Text>
+                    <Text style={styles.chatStatusText}>{t("conversation.live")}</Text>
                   </View>
                 </View>
               </View>
               <View style={styles.chatBody}>
                 <View style={[styles.bubble, styles.bubbleAi]}>
-                  <Text style={styles.bubbleAiText}>Tell me about a project you're proud of.</Text>
+                  <Text style={styles.bubbleAiText}>{t("conversation.sofiaQ1")}</Text>
                 </View>
                 <View style={[styles.bubble, styles.bubbleUser]}>
-                  <Text style={styles.bubbleUserText}>I led a redesign that doubled signups in 3 months.</Text>
+                  <Text style={styles.bubbleUserText}>{t("conversation.userA")}</Text>
                 </View>
                 <View style={[styles.bubble, styles.bubbleAi]}>
-                  <Text style={styles.bubbleAiText}>Nice — what was the hardest trade-off?</Text>
+                  <Text style={styles.bubbleAiText}>{t("conversation.sofiaQ2")}</Text>
                 </View>
               </View>
               <View style={styles.chatInput}>
@@ -975,7 +897,7 @@ export default function Home() {
                 <TextInput
                   testID="demo-chat-input"
                   style={[styles.chatInputText, { flex: 1, paddingVertical: 6, ...(Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : {}) }]}
-                  placeholder="Tap mic or type…"
+                  placeholder={t("conversation.inputPh")}
                   placeholderTextColor={C.text3}
                   value={demoText}
                   onChangeText={setDemoText}
@@ -1003,16 +925,16 @@ export default function Home() {
 
           {/* HOW IT WORKS */}
           <View style={[styles.section, { paddingVertical: 28 }]}>
-            <SectionLabel label="How" color={C.primary} />
-            <SectionTitle>How it works</SectionTitle>
+            <SectionLabel label={t("how.label")} color={C.primary} />
+            <SectionTitle>{t("how.title")}</SectionTitle>
             <View style={styles.howCard}>
-              <HowStep n={1} title="Choose service" desc="Pick what you need today." />
+              <HowStep n={1} title={t("how.s1Title")} desc={t("how.s1Desc")} />
               <View style={styles.howDivider} />
-              <HowStep n={2} title="Pay once" desc="From £4. No subscription." />
+              <HowStep n={2} title={t("how.s2Title")} desc={t("how.s2Desc")} />
               <View style={styles.howDivider} />
-              <HowStep n={3} title="Talk with avatar" desc="Real conversation, real prep." />
+              <HowStep n={3} title={t("how.s3Title")} desc={t("how.s3Desc")} />
               <View style={styles.howDivider} />
-              <HowStep n={4} title="Get results" desc="Jobs, scores & next steps." />
+              <HowStep n={4} title={t("how.s4Title")} desc={t("how.s4Desc")} />
             </View>
           </View>
 
@@ -1036,12 +958,12 @@ export default function Home() {
                   <Avatar uri={AVATARS.aria } size={50} style={styles.finalAvatar} />
                 </View>
               </View>
-              <Text style={styles.finalTitle}>Choose your career avatar</Text>
+              <Text style={styles.finalTitle}>{t("finalCta.title")}</Text>
               <Text style={styles.finalSub}>
-                It takes 30 seconds. Real human-style guidance from minute one.
+                {t("finalCta.sub")}
               </Text>
               <PressableCard testID="final-start-btn" onPress={scrollToAvatars} style={styles.finalBtn}>
-                <Text style={styles.finalBtnText}>Start now</Text>
+                <Text style={styles.finalBtnText}>{t("finalCta.btn")}</Text>
                 <Ionicons name="arrow-forward" size={16} color="#0B0F19" />
               </PressableCard>
             </View>
@@ -1049,8 +971,8 @@ export default function Home() {
 
           {/* ACCOUNT */}
           <View style={[styles.section, { paddingVertical: 24 }]}>
-            <SectionLabel label="You" color={C.text2} />
-            <SectionTitle>Account</SectionTitle>
+            <SectionLabel label={t("account.label")} color={C.text2} />
+            <SectionTitle>{t("account.title")}</SectionTitle>
             <View style={styles.accountCard}>
               <View style={styles.guestRow}>
                 <View style={[styles.guestAvatar, userName ? { backgroundColor: C.primary } : null]}>
@@ -1059,9 +981,9 @@ export default function Home() {
                   </Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.guestName}>{userName || "Guest"}</Text>
+                  <Text style={styles.guestName}>{userName || t("account.guest")}</Text>
                   <Text style={styles.guestSub}>
-                    {userName ? "Signed in · your data is saved" : "Sign in to save jobs and history"}
+                    {userName ? t("account.signedSub") : t("account.guestSub")}
                   </Text>
                 </View>
                 <Pressable
@@ -1069,7 +991,7 @@ export default function Home() {
                   onPress={() => (userName ? handleSignOut() : setSignInOpen(true))}
                   style={styles.signInBtn}
                 >
-                  <Text style={styles.signInBtnText}>{userName ? "Sign out" : "Sign in"}</Text>
+                  <Text style={styles.signInBtnText}>{userName ? t("account.signOut") : t("account.signIn")}</Text>
                 </Pressable>
               </View>
               <View style={styles.accountTabs}>
@@ -1079,7 +1001,7 @@ export default function Home() {
                   style={[styles.accountTab, accountTab === "purchases" && styles.accountTabActive]}
                 >
                   <Ionicons name="bag-handle-outline" size={14} color={accountTab === "purchases" ? C.primary : C.text2} />
-                  <Text style={[styles.accountTabText, accountTab === "purchases" && { color: C.primary }]}>Purchases</Text>
+                  <Text style={[styles.accountTabText, accountTab === "purchases" && { color: C.primary }]}>{t("account.purchases")}</Text>
                 </Pressable>
                 <Pressable
                   testID="account-tab-saved"
@@ -1087,7 +1009,7 @@ export default function Home() {
                   style={[styles.accountTab, accountTab === "saved" && styles.accountTabActive]}
                 >
                   <Ionicons name="bookmark-outline" size={14} color={accountTab === "saved" ? C.primary : C.text2} />
-                  <Text style={[styles.accountTabText, accountTab === "saved" && { color: C.primary }]}>Saved jobs</Text>
+                  <Text style={[styles.accountTabText, accountTab === "saved" && { color: C.primary }]}>{t("account.savedJobs")}</Text>
                 </Pressable>
               </View>
 
@@ -1099,7 +1021,7 @@ export default function Home() {
                   purchases.length === 0 ? (
                     <View style={styles.emptyBox}>
                       <Ionicons name="receipt-outline" size={20} color={C.text3} />
-                      <Text style={styles.emptyText}>No purchases yet. Tap any service to begin.</Text>
+                      <Text style={styles.emptyText}>{t("account.noPurchases")}</Text>
                     </View>
                   ) : (
                     <View style={{ gap: 8 }}>
@@ -1126,13 +1048,13 @@ export default function Home() {
                 ) : savedJobs.length === 0 ? (
                   <View style={styles.emptyBox}>
                     <Ionicons name="bookmark-outline" size={20} color={C.text3} />
-                    <Text style={styles.emptyText}>No saved jobs yet.</Text>
+                    <Text style={styles.emptyText}>{t("account.noSaved")}</Text>
                     <Pressable
                       testID="save-demo-job-btn"
                       onPress={handleSaveDemoJob}
                       style={[styles.smallCta, { backgroundColor: C.maya, marginTop: 10 }]}
                     >
-                      <Text style={styles.smallCtaText}>Save a sample role</Text>
+                      <Text style={styles.smallCtaText}>{t("account.saveSample")}</Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -1157,18 +1079,18 @@ export default function Home() {
           {/* FOOTER */}
           <View style={styles.footer}>
             <Text style={styles.footerNote}>
-              revoloai helps users find and prepare for job opportunities, but does not guarantee employment, interviews, or job offers.
+              {t("footer.note")}
             </Text>
             <View style={styles.footerLinks}>
-              <Text style={styles.footerLink}>Privacy Policy</Text>
+              <Text style={styles.footerLink}>{t("footer.privacy")}</Text>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>Terms</Text>
+              <Text style={styles.footerLink}>{t("footer.terms")}</Text>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>Cookies</Text>
+              <Text style={styles.footerLink}>{t("footer.cookies")}</Text>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>Data Deletion</Text>
+              <Text style={styles.footerLink}>{t("footer.deletion")}</Text>
             </View>
-            <Text style={styles.footerCopy}>© {new Date().getFullYear()} revoloai</Text>
+            <Text style={styles.footerCopy}>{t("footer.copy", { year: new Date().getFullYear() })}</Text>
           </View>
         </ScrollView>
 
@@ -1220,7 +1142,7 @@ export default function Home() {
                 style={StyleSheet.absoluteFill}
               />
               <Ionicons name="sparkles" size={16} color="#fff" />
-              <Text style={styles.stickyCtaText}>Start with {selectedAvatar === "maya" ? "Maya" : selectedAvatar === "sofia" ? "Sofia" : "Aria"}</Text>
+              <Text style={styles.stickyCtaText}>{t("home.startWith", { name: t(`avatars.${selectedAvatar}.name`) })}</Text>
             </PressableCard>
           </View>
         </View>
@@ -1229,11 +1151,11 @@ export default function Home() {
         {signInOpen && (
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Sign in</Text>
-              <Text style={styles.modalSub}>Use any name — your data stays on this device.</Text>
+              <Text style={styles.modalTitle}>{t("account.signInTitle")}</Text>
+              <Text style={styles.modalSub}>{t("account.signInSub")}</Text>
               <TextInput
                 testID="signin-name-input"
-                placeholder="Your name"
+                placeholder={t("account.namePh")}
                 placeholderTextColor={C.text3}
                 value={signInName}
                 onChangeText={setSignInName}
@@ -1243,7 +1165,7 @@ export default function Home() {
               />
               <View style={styles.modalActions}>
                 <Pressable testID="signin-cancel" onPress={() => setSignInOpen(false)} style={[styles.modalBtn, { backgroundColor: C.bgSoft }]}>
-                  <Text style={[styles.modalBtnText, { color: C.text }]}>Cancel</Text>
+                  <Text style={[styles.modalBtnText, { color: C.text }]}>{t("common.cancel")}</Text>
                 </Pressable>
                 <Pressable
                   testID="signin-confirm"
@@ -1251,7 +1173,7 @@ export default function Home() {
                   disabled={!signInName.trim()}
                   style={[styles.modalBtn, { backgroundColor: signInName.trim() ? C.primary : "#CBD0DE" }]}
                 >
-                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>Continue</Text>
+                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>{t("common.continue")}</Text>
                 </Pressable>
               </View>
             </View>
@@ -1270,7 +1192,7 @@ export default function Home() {
                   onPress={() => setTrustModal(null)}
                   style={[styles.modalBtn, { flex: 1, backgroundColor: C.primary }]}
                 >
-                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>Got it</Text>
+                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>{t("common.gotIt")}</Text>
                 </Pressable>
               </View>
             </View>

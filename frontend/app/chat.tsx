@@ -24,6 +24,7 @@ import {
   api,
   getOrCreateUserId,
 } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 type Msg = { id: string; role: "user" | "ai"; content: string };
 
@@ -31,6 +32,9 @@ export default function ChatScreen() {
   const params = useLocalSearchParams<{ avatar?: string }>();
   const key = ((params.avatar as AvatarKey) || "sofia") as AvatarKey;
   const meta = AVATAR_META[key];
+  const { t, langName } = useI18n();
+  const aName = t(`avatars.${key}.name`);
+  const aRole = t(`avatars.${key}.role`);
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [sending, setSending] = useState(false);
@@ -50,7 +54,7 @@ export default function ChatScreen() {
         setSending(true);
         const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
           method: "POST",
-          body: JSON.stringify({ avatar: key, message: "", user_id: uid }),
+          body: JSON.stringify({ avatar: key, message: "", user_id: uid, lang: langName }),
         });
         if (!alive) return;
         setSessionId(r.session_id);
@@ -58,7 +62,7 @@ export default function ChatScreen() {
         setSuggestions(r.suggestions || []);
       } catch (e) {
         setMessages([
-          { id: "ai0", role: "ai", content: `Hi, I'm ${meta.name}. How can I help today?` },
+          { id: "ai0", role: "ai", content: t("chat.fallback", { name: aName }) },
         ]);
       } finally {
         if (alive) setSending(false);
@@ -83,9 +87,9 @@ export default function ChatScreen() {
   }, [sending, typingDot]);
 
   const send = async (text: string) => {
-    const t = text.trim();
-    if (!t || sending) return;
-    const userMsg: Msg = { id: `u${Date.now()}`, role: "user", content: t };
+    const txt = text.trim();
+    if (!txt || sending) return;
+    const userMsg: Msg = { id: `u${Date.now()}`, role: "user", content: txt };
     const next = [...messages, userMsg];
     setMessages(next);
     setInput("");
@@ -95,7 +99,7 @@ export default function ChatScreen() {
       const uid = await getOrCreateUserId();
       const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
         method: "POST",
-        body: JSON.stringify({ avatar: key, message: t, session_id: sessionId, user_id: uid }),
+        body: JSON.stringify({ avatar: key, message: txt, session_id: sessionId, user_id: uid, lang: langName }),
       });
       if (r.session_id) setSessionId(r.session_id);
       const ai: Msg = { id: `a${Date.now()}`, role: "ai", content: r.reply };
@@ -105,7 +109,7 @@ export default function ChatScreen() {
     } catch {
       setMessages((m) => [
         ...m,
-        { id: `a${Date.now()}`, role: "ai", content: "I lost the connection. Try again?" },
+        { id: `a${Date.now()}`, role: "ai", content: t("chat.lostConnection") },
       ]);
     } finally {
       setSending(false);
@@ -166,10 +170,10 @@ export default function ChatScreen() {
           setListening(true);
           setTimeout(() => setListening(false), 1500);
         } else {
-          Alert.alert("Microphone unavailable", "Voice input requires a supported device.");
+          Alert.alert(t("chat.micUnavailable"), t("chat.micUnavailableMsg"));
         }
       } catch {
-        Alert.alert("Microphone permission denied");
+        Alert.alert(t("chat.micDenied"));
       }
       return;
     }
@@ -195,13 +199,13 @@ export default function ChatScreen() {
             <Avatar uri={AVATARS[key]} size={38} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.headerName}>{meta.name}</Text>
+            <Text style={styles.headerName}>{aName}</Text>
             <View style={styles.statusRow}>
               <View style={[styles.statusDot, { backgroundColor: "#10B981" }]} />
-              <Text style={styles.statusText}>{listening ? "listening…" : sending ? "typing…" : meta.role}</Text>
+              <Text style={styles.statusText}>{listening ? t("chat.listening") : sending ? t("chat.typing") : aRole}</Text>
             </View>
           </View>
-          <Pressable testID="chat-info-btn" style={styles.headerBtn} hitSlop={10} onPress={() => Alert.alert(meta.name, `${meta.role} — ${meta.name} is your AI assistant. Chats are private.`)}>
+          <Pressable testID="chat-info-btn" style={styles.headerBtn} hitSlop={10} onPress={() => Alert.alert(aName, `${aRole} — ${t("chat.info", { name: aName })}`)}>
             <Ionicons name="information-circle-outline" size={22} color="#5B6577" />
           </Pressable>
         </View>
@@ -266,7 +270,7 @@ export default function ChatScreen() {
                     />
                   )}
                   <Text style={[styles.suggText, { color: "#fff" }]}>
-                    {key === "maya" ? "Find jobs" : "Start interview"}
+                    {key === "maya" ? t("chat.findJobs") : t("chat.startInterview")}
                   </Text>
                 </Pressable>
               )}
@@ -296,7 +300,7 @@ export default function ChatScreen() {
             <TextInput
               testID="chat-input"
               style={styles.input}
-              placeholder={`Message ${meta.name}…`}
+              placeholder={t("chat.placeholder", { name: aName })}
               placeholderTextColor="#8A93A6"
               value={input}
               onChangeText={setInput}

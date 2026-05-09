@@ -5,6 +5,7 @@ import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/api";
+import { useI18n } from "../lib/i18n";
 
 type Job = { id: string; title: string; company: string; location: string; remote: string; seniority: string; salary_min: number; salary_max: number; skills: string[]; match_score: number };
 
@@ -12,6 +13,7 @@ export default function JobsScreen() {
   const params = useLocalSearchParams<{ avatar?: string }>();
   const key = ((params.avatar as AvatarKey) || "maya") as AvatarKey;
   const meta = AVATAR_META[key];
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<any>(null);
@@ -59,8 +61,8 @@ export default function JobsScreen() {
             <Avatar uri={AVATARS[key]} size={36} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={s.hTitle}>Matched jobs</Text>
-            <Text style={s.hSub}>{profile?.target_role ? `for ${profile.target_role}` : "Top picks for you"}</Text>
+            <Text style={s.hTitle}>{t("jobs.title")}</Text>
+            <Text style={s.hSub}>{profile?.target_role ? t("jobs.forRole", { role: profile.target_role }) : t("jobs.topPicks")}</Text>
           </View>
           <Pressable testID="jobs-refresh" onPress={load} style={s.iconBtn} hitSlop={10}>
             <Ionicons name="refresh" size={20} color="#5B6577" />
@@ -70,12 +72,12 @@ export default function JobsScreen() {
         {loading ? (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
             <ActivityIndicator color={meta.color} />
-            <Text style={{ marginTop: 8, color: "#5B6577" }}>Maya is searching…</Text>
+            <Text style={{ marginTop: 8, color: "#5B6577" }}>{t("jobs.searching")}</Text>
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
             {jobs.length === 0 ? (
-              <Text style={s.empty}>No matches yet. Tell Maya more about what you're looking for.</Text>
+              <Text style={s.empty}>{t("jobs.noMatches")}</Text>
             ) : null}
             {jobs.map((j) => (
               <View key={j.id} testID={`job-${j.id}`} style={s.card}>
@@ -112,12 +114,12 @@ export default function JobsScreen() {
                     ) : (
                       <>
                         <Ionicons name="bookmark-outline" size={14} color="#0B0F19" />
-                        <Text style={[s.btnText, { color: "#0B0F19" }]}>Save</Text>
+                        <Text style={[s.btnText, { color: "#0B0F19" }]}>{t("jobs.save")}</Text>
                       </>
                     )}
                   </Pressable>
                   <Pressable testID={`job-apply-${j.id}`} onPress={() => router.push({ pathname: "/chat", params: { avatar: "aria" } })} style={[s.btn, { backgroundColor: meta.color, flex: 1 }]}>
-                    <Text style={[s.btnText, { color: "#fff" }]}>Get prep</Text>
+                    <Text style={[s.btnText, { color: "#fff" }]}>{t("jobs.getPrep")}</Text>
                     <Ionicons name="arrow-forward" size={14} color="#fff" />
                   </Pressable>
                 </View>

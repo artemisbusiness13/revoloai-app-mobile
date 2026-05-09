@@ -101,3 +101,53 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Stabilise the EN + RO bilingual experience across UI, chat, interview flow, results, radar chart legends, pricing and legal pages. Do not add other languages yet."
+
+backend:
+  - task: "Plumb `lang` into Interview start & answer endpoints"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Added `lang: Optional[str] = 'English'` to InterviewStartRequest AND InterviewAnswerRequest pydantic models. Server already used req.lang in body — without this fix Romanian interviews would have crashed with AttributeError. Smoke-tested via curl: POST /api/interview/start with lang=Romanian returned a Romanian question; POST /api/chat with lang=Romanian returned a Romanian Sofia reply. Confirmed."
+        - working: true
+          agent: "testing"
+          comment: "Comprehensive bilingual EN+RO test suite executed via /app/backend_test.py against the public ingress URL — 6/6 PASS. (1a) POST /api/interview/start lang=English -> 200, English question, current=1 total=3. (1b) POST /api/interview/start lang=Romanian -> 200, question in Romanian with diacritics ('Ce te motive cel mai mult să lucrezi…'), category='behavioural' and difficulty='easy' kept as English keys. (2) POST /api/interview/answer for the Romanian interview -> 200, all 5 numeric score fields (star_coverage=70, clarity=75, confidence=80, content_depth=85, structure=70) within 0-100, feedback/strengths[]/improvements[] all written in Romanian, done=false, next_question.question in Romanian. (3) POST /api/chat avatar=sofia lang=Romanian -> 200, reply in Romanian. (4a) Regression POST /api/interview/start with no lang field -> 200, defaults to English question. (4b) Regression POST /api/interview/answer with no lang -> 200, English feedback. The pydantic `lang` field plumbing is fully working end-to-end."
+
+frontend:
+  - task: "EN + RO bilingual stability across all screens (UI, chat, interview, results, radar legends, pricing, legal pages)"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/lib/i18n.tsx, /app/frontend/lib/translations/{en,ro,types}.ts, /app/frontend/app/{index,chat,interview,results,checkout,jobs}.tsx, /app/frontend/app/legal/[slug].tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Fixes: (1) interview.tsx now passes `lang: langName` to /interview/start and /interview/answer. (2) interview.tsx Tile labels now use t('results.axes.*'). (3) checkout.tsx avatar role/name now use t(`avatars.${key}.role|name`). (4) Hardcoded 'Open' in purchases list now uses t('common.open'). (5) Added new legal/[slug] dynamic route with EN + RO translations for privacy, terms, cookies, deletion. (6) Footer links in index.tsx are now Pressable and route to /legal/[slug]. (7) types.ts extended with the `legal` shape. Verified manually with screenshots in EN and RO."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 6
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Plumb `lang` into Interview start & answer endpoints"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: "Stabilised EN + RO across all screens. Backend fix: InterviewStartRequest & InterviewAnswerRequest now accept `lang`. Frontend interview screen now passes `langName` and translates Tile labels via t('results.axes.*'). Checkout uses translated avatar role/name. Added /legal/[slug] dynamic legal pages (privacy, terms, cookies, deletion) with full EN + RO content; footer links wired up. Please retest only the Interview start + answer flow with lang=Romanian to confirm the new pydantic field and the in-app Romanian Tile labels render correctly."
+    - agent: "testing"
+      message: "Backend bilingual EN+RO suite executed successfully via /app/backend_test.py against the public ingress URL. 6/6 tests PASS: (1a) /api/interview/start lang=English -> EN question, current=1 total=3. (1b) /api/interview/start lang=Romanian -> Romanian question with diacritics, category/difficulty preserved as English keys ('behavioural', 'easy'). (2) /api/interview/answer for the Romanian interview -> all numeric scores in 0-100, feedback/strengths[]/improvements[] all in Romanian, done=false, next_question in Romanian. (3) /api/chat avatar=sofia lang=Romanian -> Romanian Sofia reply. (4) Regression: /api/interview/start and /api/interview/answer with NO lang field default to English correctly. The pydantic `lang` plumbing is fully working. No issues found. Out-of-scope endpoints (payments, profile extraction, jobs match, voice) were not retested per instructions."

@@ -156,8 +156,8 @@ export default function CheckoutScreen() {
               <Avatar uri={AVATARS[key]} size={50} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.smallLabel}>{meta.role.toUpperCase()}</Text>
-              <Text style={[styles.avatarName, { color: meta.color }]}>{meta.name}</Text>
+              <Text style={styles.smallLabel}>{t(`avatars.${key}.role`).toUpperCase()}</Text>
+              <Text style={[styles.avatarName, { color: meta.color }]}>{t(`avatars.${key}.name`)}</Text>
             </View>
           </View>
 

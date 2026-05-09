@@ -236,6 +236,61 @@ const ro: Translations = {
       structure: "Structură",
     },
   },
+  legal: {
+    privacy: {
+      title: "Politica de confidențialitate",
+      updated: "Ultima actualizare: iunie 2025",
+      intro:
+        "Procesăm doar datele minime necesare pentru a rula RevoloAI. CV-ul, conversațiile și răspunsurile tale la interviuri sunt private și rămân ale tale.",
+      sections: [
+        { h: "Date pe care le colectăm", p: "Numele de cont (opțional), un ID de utilizator generat, mesajele tale de chat, câmpurile de profil pe care alegi să le împărtășești și înregistrările de cumpărare. Nu colectăm acte de identitate sau date biometrice." },
+        { h: "Cum le folosim", p: "Pentru a rula conversațiile AI, a te potrivi cu roluri, a-ți evalua interviurile, a procesa plățile și a îmbunătăți serviciul. Nu vindem niciodată datele tale." },
+        { h: "Procesare AI", p: "Mesajele sunt trimise furnizorilor noștri AI (OpenAI / Anthropic) în baza termenilor lor enterprise. Aceștia nu se antrenează pe datele tale." },
+        { h: "Plăți", p: "Plățile sunt gestionate de Stripe (și PayPal în curând). Nu vedem și nu stocăm niciodată numărul complet al cardului." },
+        { h: "Drepturile tale", p: "Poți vizualiza, exporta sau șterge datele tale oricând din secțiunea Cont. Onorăm cererile imediat." },
+        { h: "Contact", p: "Trimite un email la privacy@revoloai.app pentru orice întrebare sau cerere legată de confidențialitate." },
+      ],
+    },
+    terms: {
+      title: "Termeni și condiții",
+      updated: "Ultima actualizare: iunie 2025",
+      intro:
+        "Folosind RevoloAI, accepți acești termeni. Sunt scurți intenționat — citește-i ca să știi la ce să te aștepți.",
+      sections: [
+        { h: "Ce oferim", p: "RevoloAI oferă ghidaj de carieră alimentat de AI: chat cu avataruri, interviuri simulate cu feedback evaluat, potrivire cu joburi, revizuire CV și planificare de carieră." },
+        { h: "Ce nu promitem", p: "RevoloAI te ajută să găsești și să te pregătești pentru oportunități, dar nu garantează angajare, interviuri sau oferte. Rezultatele depind de efortul tău și de piață." },
+        { h: "Utilizare acceptabilă", p: "Folosește serviciul pentru dezvoltarea personală a carierei. Nu abuza de AI, nu încerca să extragi prompt-uri, nu colecta conținut și nu folosi serviciul pentru a face rău altora." },
+        { h: "Plăți", p: "Serviciile sunt pay-per-use, fără abonament. Prețurile sunt afișate în GBP și debitate la finalizarea plății. Pachetele aplică reducerile afișate." },
+        { h: "Rambursări", p: "Dacă un serviciu nu a funcționat din motive tehnice, contactează-ne în 14 zile pentru rambursarea achiziției afectate." },
+        { h: "Răspundere", p: "Serviciul este oferit „așa cum este”. În măsura maximă permisă de lege, răspunderea noastră este limitată la suma plătită în ultimele 30 de zile." },
+        { h: "Modificări", p: "Putem actualiza acești termeni; modificările semnificative vor fi evidențiate în aplicație." },
+      ],
+    },
+    cookies: {
+      title: "Cookie-uri și stocare",
+      updated: "Ultima actualizare: iunie 2025",
+      intro:
+        "RevoloAI folosește o stocare locală minimă pentru a-ți reține limba, ID-ul de utilizator generat și pentru a te menține conectat. Nu rulăm trackere publicitare.",
+      sections: [
+        { h: "Ce stocăm", p: "Doar pe dispozitivul tău: un ID aleatoriu de utilizator, limba aleasă (de ex. en, ro) și un nume de afișare opțional. Fără trackere între site-uri." },
+        { h: "De ce", p: "Pentru ca conversațiile, achizițiile și joburile salvate să rămână între sesiunile de pe același dispozitiv." },
+        { h: "Terți", p: "Stripe (și PayPal în curând) pot seta propriile cookie-uri pe paginile lor de plată — vezi politicile lor pentru detalii." },
+        { h: "Șterge-le", p: "Te poți deconecta, șterge stocarea aplicației din browser sau folosi opțiunea Ștergerea datelor pentru a elimina totul." },
+      ],
+    },
+    deletion: {
+      title: "Ștergerea datelor",
+      updated: "Ultima actualizare: iunie 2025",
+      intro:
+        "Datele tale îți aparțin. Le poți șterge în întregime oricând, fără întrebări.",
+      sections: [
+        { h: "Șterge de pe acest dispozitiv", p: "Deschide secțiunea Cont și atinge Deconectare. Aceasta șterge numele, ID-ul generat și orice date stocate pe acest dispozitiv." },
+        { h: "Șterge datele de pe server", p: "Trimite un email la delete@revoloai.app de pe adresa folosită. Vom șterge conversațiile, profilul, interviurile și metadatele de cumpărare în maximum 7 zile." },
+        { h: "Ce păstrăm", p: "Păstrăm înregistrările minime de plată cerute de lege (de obicei 6 ani pentru fiscalitate). Acestea conțin doar ID-ul achiziției, suma și data — fără conținut personal." },
+        { h: "Confirmare", p: "Îți vom trimite un email când ștergerea este completă. După aceea, datele tale nu mai pot fi recuperate." },
+      ],
+    },
+  },
 };
 
 export default ro;

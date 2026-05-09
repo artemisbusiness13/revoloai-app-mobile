@@ -23,6 +23,7 @@ export default function RootLayout() {
             <Stack.Screen name="jobs" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
             <Stack.Screen name="interview" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
             <Stack.Screen name="results" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+            <Stack.Screen name="legal/[slug]" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
           </Stack>
         </I18nProvider>
       </SafeAreaProvider>

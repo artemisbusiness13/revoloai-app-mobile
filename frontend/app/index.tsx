@@ -1039,7 +1039,7 @@ export default function Home() {
                             onPress={() => openChat(p.avatar)}
                             style={[styles.smallCta, { backgroundColor: C.primary }]}
                           >
-                            <Text style={styles.smallCtaText}>Open</Text>
+                            <Text style={styles.smallCtaText}>{t("common.open")}</Text>
                           </Pressable>
                         </View>
                       ))}
@@ -1082,13 +1082,21 @@ export default function Home() {
               {t("footer.note")}
             </Text>
             <View style={styles.footerLinks}>
-              <Text style={styles.footerLink}>{t("footer.privacy")}</Text>
+              <Pressable testID="footer-privacy" onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "privacy" } })} hitSlop={8}>
+                <Text style={styles.footerLink}>{t("footer.privacy")}</Text>
+              </Pressable>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>{t("footer.terms")}</Text>
+              <Pressable testID="footer-terms" onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "terms" } })} hitSlop={8}>
+                <Text style={styles.footerLink}>{t("footer.terms")}</Text>
+              </Pressable>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>{t("footer.cookies")}</Text>
+              <Pressable testID="footer-cookies" onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "cookies" } })} hitSlop={8}>
+                <Text style={styles.footerLink}>{t("footer.cookies")}</Text>
+              </Pressable>
               <Text style={styles.footerDot}>·</Text>
-              <Text style={styles.footerLink}>{t("footer.deletion")}</Text>
+              <Pressable testID="footer-deletion" onPress={() => router.push({ pathname: "/legal/[slug]", params: { slug: "deletion" } })} hitSlop={8}>
+                <Text style={styles.footerLink}>{t("footer.deletion")}</Text>
+              </Pressable>
             </View>
             <Text style={styles.footerCopy}>{t("footer.copy", { year: new Date().getFullYear() })}</Text>
           </View>

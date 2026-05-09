@@ -112,11 +112,13 @@ class InterviewStartRequest(BaseModel):
     seniority: str = "mid"
     style: str = "behavioural"   # behavioural | technical | mixed
     total_questions: int = 6
+    lang: Optional[str] = "English"
 
 
 class InterviewAnswerRequest(BaseModel):
     interview_id: str
     answer: str
+    lang: Optional[str] = "English"
 
 
 class CheckoutCreateRequest(BaseModel):
@@ -281,10 +283,11 @@ async def match_jobs(req: JobMatchRequest):
 @api_router.post("/interview/start")
 async def interview_start(req: InterviewStartRequest):
     interview_id = str(uuid.uuid4())
-    # Generate first question via GPT JSON mode
+    lang = (req.lang or "English").strip() or "English"
+    lang_dir = f"\nReturn the question text in {lang}. Categories/difficulty stay in English keys."
     qjson = await llm_svc.openai_json(
         session_id=f"itv_{interview_id}",
-        system_prompt="You generate adaptive interview questions.",
+        system_prompt="You generate adaptive interview questions." + lang_dir,
         user_prompt=P.INTERVIEW_QUESTION_PROMPT.format(
             role=req.role, seniority=req.seniority, style=req.style, q_num=1, total=req.total_questions
         ) + "\nThere is no previous answer yet. Open with a warm motivational question.",
@@ -297,6 +300,7 @@ async def interview_start(req: InterviewStartRequest):
         "role": req.role,
         "seniority": req.seniority,
         "style": req.style,
+        "lang": lang,
         "total": req.total_questions,
         "current": 1,
         "questions": [qjson],
@@ -318,10 +322,12 @@ async def interview_answer(req: InterviewAnswerRequest):
     questions = itv["questions"]
     answers = list(itv["answers"]) + [req.answer]
     last_q = questions[current - 1]["question"] if questions else ""
+    lang = itv.get("lang") or (req.lang or "English") or "English"
+    lang_dir = f"\nWrite ALL string fields (feedback, strengths[], improvements[]) in {lang}; numeric scores stay numeric."
     # Score the answer (GPT JSON)
     sjson = await llm_svc.openai_json(
         session_id=f"itv_{req.interview_id}_score_{current}",
-        system_prompt="You score interview answers with structured rubrics.",
+        system_prompt="You score interview answers with structured rubrics." + lang_dir,
         user_prompt=P.ANSWER_SCORING_PROMPT.format(
             role=itv["role"], seniority=itv["seniority"], question=last_q, answer=req.answer
         ),
@@ -333,7 +339,7 @@ async def interview_answer(req: InterviewAnswerRequest):
         # finish: produce summary
         summary = await llm_svc.openai_json(
             session_id=f"itv_{req.interview_id}_summary",
-            system_prompt="You produce a structured interview summary.",
+            system_prompt="You produce a structured interview summary." + f"\nWrite all string fields (summary, top_strengths[], top_improvements[], next_steps[]) in {lang}. Verdict MUST stay in English (one of: 'Excellent','Strong','Promising','Needs work').",
             user_prompt=P.INTERVIEW_SUMMARY_PROMPT.format(role=itv["role"], seniority=itv["seniority"])
             + f"\nScores: {scores}",
         )
@@ -356,7 +362,7 @@ async def interview_answer(req: InterviewAnswerRequest):
     next_n = current + 1
     nq = await llm_svc.openai_json(
         session_id=f"itv_{req.interview_id}_q_{next_n}",
-        system_prompt="You generate adaptive interview questions based on the previous answer.",
+        system_prompt="You generate adaptive interview questions based on the previous answer." + f"\nReturn the question text in {lang}.",
         user_prompt=P.INTERVIEW_QUESTION_PROMPT.format(
             role=itv["role"], seniority=itv["seniority"], style=itv["style"], q_num=next_n, total=itv["total"]
         ) + f"\nPrevious question: '{last_q}'\nPrevious answer: '{req.answer}'",

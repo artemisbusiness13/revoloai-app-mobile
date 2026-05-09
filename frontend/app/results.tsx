@@ -91,7 +91,7 @@ export default function ResultsScreen() {
               <View style={st.legendRow}>
                 {AXES.map((a, i) => (
                   <View key={a.key} style={st.legendItem}>
-                    <Text style={st.legendLabel}>{a.label}</Text>
+                    <Text style={st.legendLabel}>{t(`results.axes.${a.key}`)}</Text>
                     <Text style={[st.legendVal, { color: tone(avgs[i]) }]}>{avgs[i]}</Text>
                   </View>
                 ))}

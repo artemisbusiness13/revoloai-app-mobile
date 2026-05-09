@@ -236,6 +236,61 @@ const en: Translations = {
       structure: "Structure",
     },
   },
+  legal: {
+    privacy: {
+      title: "Privacy Policy",
+      updated: "Last updated: June 2025",
+      intro:
+        "We process the minimum data needed to run RevoloAI. Your CV, conversations and interview answers are private and stay yours.",
+      sections: [
+        { h: "Data we collect", p: "Account name (optional), a generated user id, your chat messages, profile fields you choose to share, and purchase records. We do not collect ID documents or biometrics." },
+        { h: "How we use it", p: "To run AI conversations, match you to roles, score your interviews, process payments, and improve the service. We never sell your data." },
+        { h: "AI processing", p: "Messages are sent to our AI providers (OpenAI / Anthropic) under their enterprise terms. They do not train on your data." },
+        { h: "Payments", p: "Payments are handled by Stripe (and PayPal soon). We never see or store your full card number." },
+        { h: "Your rights", p: "You can view, export or delete your data at any time from the Account section. We honour requests immediately." },
+        { h: "Contact", p: "Email privacy@revoloai.app for any privacy question or request." },
+      ],
+    },
+    terms: {
+      title: "Terms of Service",
+      updated: "Last updated: June 2025",
+      intro:
+        "By using RevoloAI you agree to these terms. They are short on purpose — read them so you know what to expect.",
+      sections: [
+        { h: "What we offer", p: "RevoloAI provides AI-powered career guidance: chat with avatars, mock interviews with scored feedback, job matching, CV review and career planning." },
+        { h: "What we don't promise", p: "RevoloAI helps you find and prepare for opportunities, but does not guarantee employment, interviews, or job offers. Outcomes depend on your effort and the market." },
+        { h: "Acceptable use", p: "Use the service for personal career development. Don't abuse the AI, attempt to extract prompts, scrape content, or use the service to harm others." },
+        { h: "Payments", p: "Services are pay-per-use, no subscription. Prices are shown in GBP and charged at checkout. Bundles apply discounts as displayed." },
+        { h: "Refunds", p: "If a service did not run for technical reasons, contact us within 14 days for a refund of the affected purchase." },
+        { h: "Liability", p: "The service is provided 'as is'. To the maximum extent allowed by law, our liability is limited to the amount you paid in the last 30 days." },
+        { h: "Changes", p: "We may update these terms; meaningful changes will be highlighted in-app." },
+      ],
+    },
+    cookies: {
+      title: "Cookies & Storage",
+      updated: "Last updated: June 2025",
+      intro:
+        "RevoloAI uses minimal local storage to remember your language, your generated user id, and to keep you signed in. We do not run advertising trackers.",
+      sections: [
+        { h: "What we store", p: "On your device only: a random user id, your chosen language (e.g. en, ro), and an optional display name. No cross-site trackers." },
+        { h: "Why", p: "So your conversations, purchases and saved jobs survive between sessions on the same device." },
+        { h: "Third parties", p: "Stripe (and PayPal soon) may set their own cookies on their checkout pages — see their policies for details." },
+        { h: "Clear it", p: "You can sign out, clear app storage in your browser, or use the Data Deletion option to wipe everything." },
+      ],
+    },
+    deletion: {
+      title: "Data Deletion",
+      updated: "Last updated: June 2025",
+      intro:
+        "Your data is yours. You can wipe it all at any time, no questions asked.",
+      sections: [
+        { h: "Delete from this device", p: "Open the Account section and tap Sign out. This clears your name, generated user id and any cached data on this device." },
+        { h: "Delete server-side data", p: "Email delete@revoloai.app from the address you used. We will erase chats, profile, interviews and purchase metadata within 7 days." },
+        { h: "What we keep", p: "We keep minimum payment records required by law (typically 6 years for tax). These contain only purchase id, amount and date — no personal content." },
+        { h: "Confirmation", p: "We will email you once deletion is complete. After that, your data cannot be recovered." },
+      ],
+    },
+  },
 };
 
 export default en;

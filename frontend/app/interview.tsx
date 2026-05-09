@@ -37,7 +37,7 @@ export default function InterviewScreen() {
   const [lastScore, setLastScore] = useState<Score | null>(null);
   const [starting, setStarting] = useState(true);
   const meta = AVATAR_META.sofia;
-  const { t } = useI18n();
+  const { t, langName } = useI18n();
   const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export default function InterviewScreen() {
         const uid = await getOrCreateUserId();
         const r = await api<{ interview_id: string; question: Question; current: number; total: number }>("/interview/start", {
           method: "POST",
-          body: JSON.stringify({ user_id: uid, role, seniority, style: "behavioural", total_questions: total }),
+          body: JSON.stringify({ user_id: uid, role, seniority, style: "behavioural", total_questions: total, lang: langName }),
         });
         setInterviewId(r.interview_id);
         setQuestion(r.question);
@@ -57,16 +57,16 @@ export default function InterviewScreen() {
         setStarting(false);
       }
     })();
-  }, [role, seniority, total, fade]);
+  }, [role, seniority, total, fade, langName]);
 
   const submit = async () => {
-    const t = answer.trim();
-    if (!t || !interviewId || submitting) return;
+    const txt = answer.trim();
+    if (!txt || !interviewId || submitting) return;
     setSubmitting(true);
     try {
       const r = await api<any>("/interview/answer", {
         method: "POST",
-        body: JSON.stringify({ interview_id: interviewId, answer: t }),
+        body: JSON.stringify({ interview_id: interviewId, answer: txt, lang: langName }),
       });
       setLastScore(r.score || null);
       if (r.done) {
@@ -135,11 +135,11 @@ export default function InterviewScreen() {
                 </View>
                 {!!lastScore.feedback && <Text style={{ color: "#5B6577", marginBottom: 8, lineHeight: 18 }}>{lastScore.feedback}</Text>}
                 <View style={{ flexDirection: "row", gap: 6, flexWrap: "wrap" }}>
-                  <Tile label="STAR" v={lastScore.star_coverage} />
-                  <Tile label="Clarity" v={lastScore.clarity} />
-                  <Tile label="Confidence" v={lastScore.confidence} />
-                  <Tile label="Depth" v={lastScore.content_depth} />
-                  <Tile label="Structure" v={lastScore.structure} />
+                  <Tile label={t("results.axes.star_coverage")} v={lastScore.star_coverage} />
+                  <Tile label={t("results.axes.clarity")} v={lastScore.clarity} />
+                  <Tile label={t("results.axes.confidence")} v={lastScore.confidence} />
+                  <Tile label={t("results.axes.content_depth")} v={lastScore.content_depth} />
+                  <Tile label={t("results.axes.structure")} v={lastScore.structure} />
                 </View>
               </View>
             )}

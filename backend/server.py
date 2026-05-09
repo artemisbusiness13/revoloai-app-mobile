@@ -446,38 +446,40 @@ async def payments_status(session_id: str, request: Request):
     """Return payment status. Tries Stripe first; falls back to our local
     DB record (updated by webhook OR /payments/confirm)."""
     purchase = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
-    try:
-        sc = _get_stripe(request)
-        st = await sc.get_checkout_status(session_id)
-        new_status = "paid" if st.payment_status == "paid" else ("expired" if st.status == "expired" else "pending")
-        if purchase and purchase.get("status") != new_status and new_status == "paid":
-            await db.purchases.update_one(
-                {"stripe_session_id": session_id},
-                {"$set": {"status": "paid", "paid_at": now_utc()}},
-            )
-            purchase["status"] = "paid"
-        return {
-            "session_id": session_id,
-            "status": st.status,
-            "payment_status": st.payment_status,
-            "amount_total": st.amount_total,
-            "currency": st.currency,
-            "purchase": purchase,
-        }
-    except Exception as e:
-        # Proxy may not support GET — fall back to local DB
-        log.info("Stripe status fallback to DB for %s: %s", session_id, e)
-        if not purchase:
-            raise HTTPException(status_code=404, detail="Session not found")
-        return {
-            "session_id": session_id,
-            "status": "complete" if purchase.get("status") == "paid" else "open",
-            "payment_status": purchase.get("status") or "pending",
-            "amount_total": purchase.get("amount"),
-            "currency": purchase.get("currency"),
-            "purchase": purchase,
-            "via": "db",
-        }
+    use_emergent_sandbox = "sk_test_emergent" in os.environ.get("STRIPE_API_KEY", "")
+    if not use_emergent_sandbox:
+        try:
+            sc = _get_stripe(request)
+            st = await sc.get_checkout_status(session_id)
+            new_status = "paid" if st.payment_status == "paid" else ("expired" if st.status == "expired" else "pending")
+            if purchase and purchase.get("status") != new_status and new_status == "paid":
+                await db.purchases.update_one(
+                    {"stripe_session_id": session_id},
+                    {"$set": {"status": "paid", "paid_at": now_utc()}},
+                )
+                purchase["status"] = "paid"
+            return {
+                "session_id": session_id,
+                "status": st.status,
+                "payment_status": st.payment_status,
+                "amount_total": st.amount_total,
+                "currency": st.currency,
+                "purchase": purchase,
+            }
+        except Exception as e:
+            log.info("Stripe status fallback to DB for %s: %s", session_id, e)
+    # Sandbox or proxy unavailable: read from DB
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {
+        "session_id": session_id,
+        "status": "complete" if purchase.get("status") == "paid" else "open",
+        "payment_status": purchase.get("status") or "pending",
+        "amount_total": purchase.get("amount"),
+        "currency": purchase.get("currency"),
+        "purchase": purchase,
+        "via": "db",
+    }
 
 
 @api_router.post("/payments/confirm/{session_id}")

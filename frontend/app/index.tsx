@@ -911,10 +911,7 @@ const cardShadow = Platform.select({
   },
   android: { elevation: 2 },
   default: {
-    shadowColor: "#0B0F19",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.06,
-    shadowRadius: 18,
+    boxShadow: "0px 6px 18px rgba(11, 15, 25, 0.06)",
   },
 });
 

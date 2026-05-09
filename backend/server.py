@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from fastapi.responses import FileResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -60,7 +60,7 @@ ASSETS_DIR = ROOT_DIR.parent / "frontend" / "assets" / "images"
 async def get_avatar(name: str):
     safe = {"maya", "sofia", "aria"}
     if name not in safe:
-        return {"error": "not found"}
+        raise HTTPException(status_code=404, detail="Avatar not found")
     return FileResponse(str(ASSETS_DIR / f"avatar-{name}.png"), media_type="image/png")
 
 # Include the router in the main app

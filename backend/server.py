@@ -275,8 +275,8 @@ async def upsert_profile(user_id: str, body: ProfileIn):
 @api_router.post("/jobs/match")
 async def match_jobs(req: JobMatchRequest):
     profile = await db.profiles.find_one({"user_id": req.user_id}, {"_id": 0}) or {}
-    matches = await jobs_svc.search_pool(profile, limit=req.limit)
-    return {"profile": profile, "matches": matches}
+    matches = await jobs_svc.search(profile, limit=req.limit)
+    return {"profile": profile, "matches": matches, "live": jobs_svc.adzuna_enabled()}
 
 
 # ---------------- Interview (Sofia adaptive) ----------------
@@ -624,6 +624,20 @@ async def voice_tts(payload: Dict[str, Any]):
         raise HTTPException(status_code=501, detail="Voice not configured")
     audio = await voice_svc.tts(text, avatar)
     return Response(content=audio, media_type="audio/mpeg")
+
+
+# ---------------- Integration status (for deploy diagnostics) ----------------
+@api_router.get("/integrations/status")
+async def integrations_status():
+    """Quick health check showing which optional integrations are configured.
+    Safe to expose — returns booleans only, never the key values."""
+    return {
+        "anthropic_direct": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+        "emergent_llm": bool(os.environ.get("EMERGENT_LLM_KEY", "").strip()),
+        "adzuna_live": jobs_svc.adzuna_enabled(),
+        "stripe": bool(os.environ.get("STRIPE_API_KEY", "").strip()),
+        "voice": voice_svc.is_enabled(),
+    }
 
 
 # ---------------- Wire up app ----------------

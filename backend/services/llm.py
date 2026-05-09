@@ -9,10 +9,26 @@ from emergentintegrations.llm.chat import LlmChat, UserMessage
 logger = logging.getLogger(__name__)
 
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY", "")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
 
 CLAUDE_MODEL = ("anthropic", "claude-sonnet-4-5-20250929")
 OPENAI_MODEL = ("openai", "gpt-4o-mini")
 HAIKU_MODEL = ("anthropic", "claude-haiku-4-5-20251001")
+
+# Direct Anthropic SDK model name (used only when ANTHROPIC_API_KEY is provided).
+DIRECT_CLAUDE_MODEL = "claude-sonnet-4-5-20250929"
+
+_anthropic_client = None
+def _get_anthropic_client():
+    global _anthropic_client
+    if _anthropic_client is None and ANTHROPIC_API_KEY:
+        try:
+            from anthropic import AsyncAnthropic  # imported lazily
+            _anthropic_client = AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        except Exception as e:
+            logger.exception("Failed to init Anthropic client: %s", e)
+            _anthropic_client = None
+    return _anthropic_client
 
 
 def _new_chat(session_id: str, system_prompt: str, provider_model: tuple = CLAUDE_MODEL) -> LlmChat:
@@ -31,26 +47,41 @@ async def claude_chat(
     latest_user_message: str,
 ) -> str:
     """Send a single user message and return Claude's reply.
-    The library maintains its own internal history per LlmChat instance,
-    so we re-seed by sending all prior messages in order before the new one
-    only when there's no prior conversation in this process. Since we create
-    a fresh LlmChat per request, we instead build a single composite user
-    message that includes any unsent context. For simplicity and reliability,
-    we serialise prior history into the system prompt as a compact transcript
-    and send only the latest user message.
+
+    Routing:
+      - If ANTHROPIC_API_KEY is set -> use Anthropic SDK directly (production path).
+      - Else -> fall back to Emergent universal key.
     """
-    if not EMERGENT_LLM_KEY:
-        return "(LLM key missing — please configure EMERGENT_LLM_KEY)"
     transcript = ""
     for m in history[-12:]:
         role = "User" if m.get("role") == "user" else "Assistant"
         transcript += f"\n{role}: {m.get('content', '').strip()}"
-    sys = system_prompt + (
+    sys_with_history = system_prompt + (
         f"\n\nConversation so far (most recent last):{transcript}\n\nContinue the conversation naturally."
         if transcript
         else ""
     )
-    chat = _new_chat(session_id, sys, CLAUDE_MODEL)
+
+    # ---- Direct Anthropic path ----
+    client = _get_anthropic_client()
+    if client is not None:
+        try:
+            msg = await client.messages.create(
+                model=DIRECT_CLAUDE_MODEL,
+                max_tokens=1024,
+                system=sys_with_history,
+                messages=[{"role": "user", "content": latest_user_message}],
+            )
+            parts = [b.text for b in (msg.content or []) if getattr(b, "type", None) == "text"]
+            return ("".join(parts) or "").strip() or "(empty reply)"
+        except Exception as e:
+            logger.exception("Direct Anthropic chat error, falling back to Emergent: %s", e)
+            # fall through to Emergent fallback
+
+    # ---- Emergent fallback ----
+    if not EMERGENT_LLM_KEY:
+        return "(LLM key missing — please configure ANTHROPIC_API_KEY or EMERGENT_LLM_KEY)"
+    chat = _new_chat(session_id, sys_with_history, CLAUDE_MODEL)
     try:
         reply = await chat.send_message(UserMessage(text=latest_user_message))
         return (reply or "").strip()

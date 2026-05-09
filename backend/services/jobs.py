@@ -1,10 +1,23 @@
 """Job search service. Typed integration layer + scoring.
-Currently uses an in-memory curated pool. Swap `search_pool` for an Adzuna/Reed
-client without changing call sites.
+
+Live source: Adzuna API (used when ADZUNA_APP_ID + ADZUNA_APP_KEY are set).
+Fallback: in-memory curated pool (`search_pool`).
 """
 from __future__ import annotations
-from typing import List, Dict, Any
+import os
+import logging
+from typing import List, Dict, Any, Optional
 import uuid
+
+logger = logging.getLogger(__name__)
+
+ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "").strip()
+ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "").strip()
+ADZUNA_COUNTRY = os.getenv("ADZUNA_COUNTRY", "gb").strip().lower() or "gb"
+
+
+def adzuna_enabled() -> bool:
+    return bool(ADZUNA_APP_ID and ADZUNA_APP_KEY)
 
 
 # Curated demo pool — labelled to be intentionally diverse so matching is meaningful.
@@ -71,3 +84,100 @@ async def search_pool(profile: Dict[str, Any], limit: int = 10) -> List[Dict[str
         scored.append({**job, "match_score": s})
     scored.sort(key=lambda j: j["match_score"], reverse=True)
     return scored[:limit]
+
+
+# ---------------- Adzuna (live API) ----------------
+def _adzuna_remote_label(loc_text: str) -> str:
+    t = (loc_text or "").lower()
+    if "remote" in t or "anywhere" in t:
+        return "remote"
+    if "hybrid" in t:
+        return "hybrid"
+    return "onsite"
+
+
+def _adzuna_seniority(title: str) -> str:
+    t = (title or "").lower()
+    if any(k in t for k in ["principal", "staff"]):
+        return "principal"
+    if any(k in t for k in ["lead", "head of"]):
+        return "lead"
+    if "senior" in t or "sr." in t:
+        return "senior"
+    if any(k in t for k in ["junior", "jr.", "graduate", "trainee", "intern"]):
+        return "junior"
+    if any(k in t for k in ["mid", "intermediate"]):
+        return "mid"
+    return "mid"
+
+
+def _normalise_adzuna_job(raw: Dict[str, Any]) -> Dict[str, Any]:
+    title = raw.get("title") or ""
+    company = (raw.get("company") or {}).get("display_name") or ""
+    loc = (raw.get("location") or {}).get("display_name") or ""
+    return {
+        "id": str(raw.get("id") or uuid.uuid4()),
+        "title": title,
+        "company": company,
+        "location": loc,
+        "remote": _adzuna_remote_label(f"{title} {loc}"),
+        "seniority": _adzuna_seniority(title),
+        "salary_min": int(raw["salary_min"]) if raw.get("salary_min") else None,
+        "salary_max": int(raw["salary_max"]) if raw.get("salary_max") else None,
+        "skills": [],  # Adzuna doesn't return structured skills
+        "url": raw.get("redirect_url") or "",
+        "description": (raw.get("description") or "")[:400],
+        "source": "adzuna",
+    }
+
+
+async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Live Adzuna search. Returns [] on error so caller can fall back."""
+    if not adzuna_enabled():
+        return []
+    import httpx
+    what = (profile.get("target_role") or "").strip() or " ".join(
+        (profile.get("skills") or [])[:3]
+    ) or "any"
+    where = (profile.get("location") or "").strip()
+    salary_min = profile.get("salary_min") or None
+    params = {
+        "app_id": ADZUNA_APP_ID,
+        "app_key": ADZUNA_APP_KEY,
+        "results_per_page": max(1, min(int(limit), 50)),
+        "what": what,
+        "content-type": "application/json",
+    }
+    if where:
+        params["where"] = where
+    if salary_min:
+        params["salary_min"] = int(salary_min)
+
+    url = f"https://api.adzuna.com/v1/api/jobs/{ADZUNA_COUNTRY}/search/1"
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            r = await client.get(url, params=params)
+            r.raise_for_status()
+            data = r.json()
+    except Exception as e:
+        logger.exception("Adzuna search failed: %s", e)
+        return []
+
+    raw_jobs = data.get("results") or []
+    scored: List[Dict[str, Any]] = []
+    for raw in raw_jobs:
+        job = _normalise_adzuna_job(raw)
+        job["match_score"] = _heuristic_score(profile, job)
+        scored.append(job)
+    scored.sort(key=lambda j: j["match_score"], reverse=True)
+    return scored[:limit]
+
+
+async def search(profile: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
+    """Unified entrypoint: live Adzuna when configured, else curated pool."""
+    if adzuna_enabled():
+        live = await search_adzuna(profile, limit=limit)
+        if live:
+            return live
+        logger.info("Adzuna returned no/error results, falling back to curated pool.")
+    return await search_pool(profile, limit=limit)

@@ -1,0 +1,60 @@
+# Netlify build config for RevoloAI PWA (Expo web export)
+#
+# IMPORTANT: Set EXPO_PUBLIC_BACKEND_URL in Netlify dashboard → Site settings
+# → Environment variables. It must point to the public URL of the Emergent
+# FastAPI backend (Deployment 3), e.g. https://revoloai-backend.emergent.host
+# or whatever your Emergent deployment hostname is.
+#
+# All /api/* calls in the frontend bundle will be sent to that origin.
+
+[build]
+  base = "frontend"
+  command = "yarn install --frozen-lockfile && npx expo export --platform web"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  YARN_VERSION = "1.22.22"
+  # Set EXPO_PUBLIC_BACKEND_URL in the Netlify UI, NOT here.
+
+# SPA fallback — every unknown route serves the SPA shell
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# PWA + correct MIME types & cache headers
+[[headers]]
+  for = "/service-worker.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Type = "application/manifest+json"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/avatars/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/_expo/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

@@ -1,0 +1,62 @@
+{
+  "name": "RevoloAI — AI Career Assistant",
+  "short_name": "RevoloAI",
+  "description": "Your AI Career Assistant — three friendly avatars guide you from CV to offer. Find jobs, practice interviews, and get hired faster.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FAFAFB",
+  "theme_color": "#5B5FE9",
+  "lang": "en",
+  "categories": ["productivity", "business", "education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Chat with Sofia",
+      "short_name": "Sofia",
+      "description": "Practice interviews with Sofia",
+      "url": "/chat?avatar=sofia",
+      "icons": [{ "src": "/avatars/sofia.png", "sizes": "229x229" }]
+    },
+    {
+      "name": "Find jobs with Maya",
+      "short_name": "Maya",
+      "description": "Discover matched roles",
+      "url": "/chat?avatar=maya",
+      "icons": [{ "src": "/avatars/maya.png", "sizes": "238x238" }]
+    },
+    {
+      "name": "Career planning with Aria",
+      "short_name": "Aria",
+      "description": "Plan your next move",
+      "url": "/chat?avatar=aria",
+      "icons": [{ "src": "/avatars/aria.png", "sizes": "219x219" }]
+    }
+  ]
+}

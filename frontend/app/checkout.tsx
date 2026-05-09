@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Animated,
   Easing,
   Platform,
+  Linking,
+  AppState,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, router } from "expo-router";
@@ -46,7 +48,8 @@ export default function CheckoutScreen() {
   const [method, setMethod] = useState<"stripe" | "paypal">("stripe");
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
-  const fade = React.useRef(new Animated.Value(0)).current;
+  const [pollSession, setPollSession] = useState<string | null>(null);
+  const fade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (done) {
@@ -59,30 +62,71 @@ export default function CheckoutScreen() {
     }
   }, [done, fade]);
 
+  // Poll status when redirected back to the app
+  useEffect(() => {
+    if (!pollSession) return;
+    let stopped = false;
+    let attempts = 0;
+    const tick = async () => {
+      if (stopped || attempts >= 30) return;
+      attempts++;
+      try {
+        const r = await api<any>(`/payments/status/${pollSession}`);
+        if (r.payment_status === "paid") {
+          setDone(true);
+          setPaying(false);
+          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          return;
+        }
+        if (r.status === "expired") {
+          setPaying(false);
+          setPollSession(null);
+          Alert.alert("Payment cancelled", "The checkout session expired.");
+          return;
+        }
+      } catch {}
+      setTimeout(tick, 2500);
+    };
+    tick();
+    const sub = AppState.addEventListener("change", (st) => {
+      if (st === "active") tick();
+    });
+    return () => {
+      stopped = true;
+      sub.remove();
+    };
+  }, [pollSession]);
+
   const pay = async () => {
     if (paying || done) return;
+    if (method === "paypal") {
+      Alert.alert("PayPal coming soon", "Use card (Stripe) for now — PayPal will be enabled when sandbox creds are set.");
+      return;
+    }
     setPaying(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
       const user_id = await getOrCreateUserId();
-      await api("/purchases", {
+      const origin = Platform.OS === "web"
+        ? (typeof window !== "undefined" ? window.location.origin : "")
+        : "";
+      const r = await api<{ url: string; session_id: string }>("/payments/checkout", {
         method: "POST",
         body: JSON.stringify({
           user_id,
-          avatar: key,
           item_id: item.id,
-          item_title: item.title,
-          price: item.price,
-          kind: item.kind,
+          success_url: `${origin}/?paid=1&session={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${origin}/?cancelled=1`,
         }),
       });
-      // small simulated processing time
-      await new Promise((r) => setTimeout(r, 700));
-      setDone(true);
-      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setPollSession(r.session_id);
+      if (Platform.OS === "web") {
+        window.location.href = r.url;
+      } else {
+        await Linking.openURL(r.url);
+      }
     } catch (e: any) {
       Alert.alert("Payment failed", e?.message || "Please try again.");
-    } finally {
       setPaying(false);
     }
   };

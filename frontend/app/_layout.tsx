@@ -18,6 +18,9 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="chat" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
           <Stack.Screen name="checkout" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+          <Stack.Screen name="jobs" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+          <Stack.Screen name="interview" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+          <Stack.Screen name="results" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

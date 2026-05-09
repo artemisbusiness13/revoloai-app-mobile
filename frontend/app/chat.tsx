@@ -36,6 +36,8 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [listening, setListening] = useState(false);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const [matching, setMatching] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const typingDot = useRef(new Animated.Value(0)).current;
 
@@ -43,14 +45,15 @@ export default function ChatScreen() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      await getOrCreateUserId();
+      const uid = await getOrCreateUserId();
       try {
         setSending(true);
-        const r = await api<{ reply: string; suggestions: string[] }>("/chat", {
+        const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
           method: "POST",
-          body: JSON.stringify({ avatar: key, message: "", history: [] }),
+          body: JSON.stringify({ avatar: key, message: "", user_id: uid }),
         });
         if (!alive) return;
+        setSessionId(r.session_id);
         setMessages([{ id: "ai0", role: "ai", content: r.reply }]);
         setSuggestions(r.suggestions || []);
       } catch (e) {
@@ -89,11 +92,12 @@ export default function ChatScreen() {
     setSending(true);
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
     try {
-      const history = next.map((m) => ({ role: m.role, content: m.content }));
-      const r = await api<{ reply: string; suggestions: string[] }>("/chat", {
+      const uid = await getOrCreateUserId();
+      const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
         method: "POST",
-        body: JSON.stringify({ avatar: key, message: t, history }),
+        body: JSON.stringify({ avatar: key, message: t, session_id: sessionId, user_id: uid }),
       });
+      if (r.session_id) setSessionId(r.session_id);
       const ai: Msg = { id: `a${Date.now()}`, role: "ai", content: r.reply };
       setMessages((m) => [...m, ai]);
       setSuggestions(r.suggestions || []);
@@ -105,6 +109,49 @@ export default function ChatScreen() {
       ]);
     } finally {
       setSending(false);
+    }
+  };
+
+  // Maya-only: find matched jobs (extracts profile from chat then ranks)
+  const findJobs = async () => {
+    if (matching) return;
+    setMatching(true);
+    try {
+      const uid = await getOrCreateUserId();
+      if (sessionId) {
+        await api("/profile/extract", {
+          method: "POST",
+          body: JSON.stringify({ user_id: uid, session_id: sessionId }),
+        }).catch(() => {});
+      }
+      router.push({ pathname: "/jobs", params: { avatar: key } });
+    } finally {
+      setMatching(false);
+    }
+  };
+
+  // Sofia-only: start a real adaptive interview
+  const startInterview = async () => {
+    if (matching) return;
+    setMatching(true);
+    try {
+      const uid = await getOrCreateUserId();
+      // Try to enrich from current chat first
+      if (sessionId) {
+        await api("/profile/extract", {
+          method: "POST",
+          body: JSON.stringify({ user_id: uid, session_id: sessionId }),
+        }).catch(() => {});
+      }
+      const profile = await api<any>(`/profile/${uid}`).catch(() => null);
+      const role = profile?.target_role || "Generalist";
+      const seniority = profile?.seniority && profile.seniority !== "unknown" ? profile.seniority : "mid";
+      router.push({
+        pathname: "/interview",
+        params: { role, seniority, total: "5" },
+      });
+    } finally {
+      setMatching(false);
     }
   };
 
@@ -202,6 +249,27 @@ export default function ChatScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.suggRow}
             >
+              {(key === "maya" || key === "sofia") && (
+                <Pressable
+                  testID={key === "maya" ? "chat-find-jobs" : "chat-start-interview"}
+                  onPress={key === "maya" ? findJobs : startInterview}
+                  style={[styles.suggChip, { backgroundColor: meta.color, borderColor: meta.color }]}
+                  disabled={matching}
+                >
+                  {matching ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons
+                      name={key === "maya" ? "briefcase" : "play"}
+                      size={12}
+                      color="#fff"
+                    />
+                  )}
+                  <Text style={[styles.suggText, { color: "#fff" }]}>
+                    {key === "maya" ? "Find jobs" : "Start interview"}
+                  </Text>
+                </Pressable>
+              )}
               {suggestions.map((s, i) => (
                 <Pressable
                   key={s + i}

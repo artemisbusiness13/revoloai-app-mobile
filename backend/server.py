@@ -542,6 +542,80 @@ async def voice_status():
     return {"enabled": voice_svc.is_enabled(), "voices": voice_svc.VOICE_IDS}
 
 
+# ---------------- Demo / Preview seeding ----------------
+@api_router.post("/demo/seed")
+async def demo_seed(payload: Dict[str, Any]):
+    """Seed sample purchases and saved jobs for a given user_id so the
+    preview/demo experience showcases the full account flow without
+    going through real payments. Idempotent: clears prior demo rows first.
+    """
+    user_id = (payload.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id required")
+
+    # Wipe any prior demo rows for this user so seed is idempotent
+    await db.purchases.delete_many({"user_id": user_id, "is_demo": True})
+    await db.saved_jobs.delete_many({"user_id": user_id, "is_demo": True})
+
+    # Sample saved jobs
+    sample_jobs = [
+        {"id": str(uuid.uuid4()), "user_id": user_id, "title": "Senior Product Designer", "company": "Northwind Labs", "location": "Remote · UK", "is_demo": True, "created_at": now_utc()},
+        {"id": str(uuid.uuid4()), "user_id": user_id, "title": "Customer Success Manager", "company": "Brightline", "location": "London, UK", "is_demo": True, "created_at": now_utc()},
+        {"id": str(uuid.uuid4()), "user_id": user_id, "title": "Data Analyst", "company": "Helix Health", "location": "Hybrid · Manchester", "is_demo": True, "created_at": now_utc()},
+    ]
+    await db.saved_jobs.insert_many([j.copy() for j in sample_jobs])
+
+    # Sample paid purchases
+    sample_purchases = [
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "avatar": "sofia",
+            "item_id": "itv-standard",
+            "item_title": "Interview Sim · Standard",
+            "amount": 899,
+            "currency": "gbp",
+            "kind": "service",
+            "status": "paid",
+            "stripe_session_id": f"demo_{uuid.uuid4()}",
+            "stripe_url": "",
+            "is_demo": True,
+            "created_at": now_utc(),
+            "paid_at": now_utc(),
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "user_id": user_id,
+            "avatar": "maya",
+            "item_id": "jobs-5",
+            "item_title": "Job Finder · 5 roles",
+            "amount": 699,
+            "currency": "gbp",
+            "kind": "service",
+            "status": "paid",
+            "stripe_session_id": f"demo_{uuid.uuid4()}",
+            "stripe_url": "",
+            "is_demo": True,
+            "created_at": now_utc(),
+            "paid_at": now_utc(),
+        },
+    ]
+    await db.purchases.insert_many([p.copy() for p in sample_purchases])
+
+    return {"ok": True, "saved_jobs": len(sample_jobs), "purchases": len(sample_purchases)}
+
+
+@api_router.post("/demo/reset")
+async def demo_reset(payload: Dict[str, Any]):
+    """Remove all demo-tagged rows for a given user_id."""
+    user_id = (payload.get("user_id") or "").strip()
+    if not user_id:
+        raise HTTPException(status_code=400, detail="user_id required")
+    p = await db.purchases.delete_many({"user_id": user_id, "is_demo": True})
+    j = await db.saved_jobs.delete_many({"user_id": user_id, "is_demo": True})
+    return {"ok": True, "purchases_removed": p.deleted_count, "saved_jobs_removed": j.deleted_count}
+
+
 @api_router.post("/voice/tts")
 async def voice_tts(payload: Dict[str, Any]):
     avatar = (payload.get("avatar") or "sofia").lower()

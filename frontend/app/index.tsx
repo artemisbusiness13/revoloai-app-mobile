@@ -28,6 +28,7 @@ import {
   clearUserName,
 } from "../lib/api";
 import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
+import { useDemo } from "../lib/demo";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -309,6 +310,7 @@ function TrustCard({
 export default function Home() {
   const insets = useSafeAreaInsets();
   const { t, tArr, lang, setLang, langName } = useI18n();
+  const { isDemo, enableDemo, refreshTick } = useDemo();
   const scrollRef = useRef<ScrollView>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<"maya" | "sofia" | "aria">("sofia");
 
@@ -414,7 +416,23 @@ export default function Home() {
       const n = await getUserName();
       setUserNameState(n);
     })();
+    // Prefetch avatar images for snappy first render
+    if (Platform.OS !== "web") {
+      RNImage.prefetch(AVATARS.maya).catch(() => {});
+      RNImage.prefetch(AVATARS.sofia).catch(() => {});
+      RNImage.prefetch(AVATARS.aria).catch(() => {});
+    }
   }, []);
+
+  // Refresh account whenever demo seed/reset bumps the tick + sync display name
+  useEffect(() => {
+    (async () => {
+      const n = await getUserName();
+      setUserNameState(n);
+    })();
+    reloadAccount();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshTick]);
 
   // Detect Stripe success / cancel redirect on web
   useEffect(() => {
@@ -1171,6 +1189,19 @@ export default function Home() {
                 autoFocus
                 onSubmitEditing={handleSignIn}
               />
+              <Pressable
+                testID="signin-try-demo"
+                onPress={async () => {
+                  setSignInOpen(false);
+                  await enableDemo();
+                  if (Platform.OS !== "web")
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+                }}
+                style={styles.demoTryBtn}
+              >
+                <Ionicons name="sparkles" size={14} color={C.emerald} />
+                <Text style={styles.demoTryText}>{t("demo.enableTitle")}</Text>
+              </Pressable>
               <View style={styles.modalActions}>
                 <Pressable testID="signin-cancel" onPress={() => setSignInOpen(false)} style={[styles.modalBtn, { backgroundColor: C.bgSoft }]}>
                   <Text style={[styles.modalBtnText, { color: C.text }]}>{t("common.cancel")}</Text>
@@ -1848,6 +1879,19 @@ const styles = StyleSheet.create({
     ...(Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : {}),
   },
   modalActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  demoTryBtn: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: C.emeraldSoft,
+    borderWidth: 1,
+    borderColor: C.emerald + "33",
+  },
+  demoTryText: { fontSize: 13, fontWeight: "700", color: C.emerald },
   modalBtn: {
     flex: 1,
     paddingVertical: 12,

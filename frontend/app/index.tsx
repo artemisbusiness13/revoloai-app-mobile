@@ -87,9 +87,9 @@ const C = {
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 const AVATARS = {
-  maya: `${BACKEND}/api/avatars/maya`,
-  sofia: `${BACKEND}/api/avatars/sofia`,
-  aria: `${BACKEND}/api/avatars/aria`,
+  maya: `/avatars/maya.png`,
+  sofia: `/avatars/sofia.png`,
+  aria: `/avatars/aria.png`,
 };
 
 const { width: SCREEN_W } = Dimensions.get("window");

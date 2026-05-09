@@ -280,7 +280,37 @@ def test_payments_status(s, checkout):
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["session_id"] == sid
-    assert body.get("payment_status") in {"unpaid", "paid"}
+    # Either real Stripe (unpaid/paid) or DB fallback (pending/paid)
+    assert body.get("payment_status") in {"unpaid", "paid", "pending"}, body
+    # purchase doc must be embedded
+    assert body.get("purchase") is not None
+    assert body["purchase"]["stripe_session_id"] == sid
+
+
+def test_payments_status_unknown_404(s):
+    r = s.get(URL("/payments/status/cs_test_nonexistent_xyz_123"), timeout=LONG_TIMEOUT)
+    assert r.status_code == 404
+
+
+def test_payments_confirm_marks_paid(s, checkout):
+    sid = checkout["session_id"]
+    # Confirm
+    r = s.post(URL(f"/payments/confirm/{sid}"), timeout=SHORT_TIMEOUT)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["ok"] is True
+    assert body["purchase"]["status"] == "paid"
+    # Status should now reflect paid via DB fallback (or real Stripe)
+    r2 = s.get(URL(f"/payments/status/{sid}"), timeout=LONG_TIMEOUT)
+    assert r2.status_code == 200
+    s2 = r2.json()
+    assert s2.get("payment_status") == "paid", s2
+    assert s2.get("status") in {"complete", "paid"}, s2
+
+
+def test_payments_confirm_unknown_404(s):
+    r = s.post(URL("/payments/confirm/cs_test_does_not_exist_zzz"), timeout=SHORT_TIMEOUT)
+    assert r.status_code == 404
 
 
 # ---------------- Voice ----------------

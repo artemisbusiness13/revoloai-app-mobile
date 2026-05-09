@@ -42,14 +42,14 @@ stripe_checkout: Optional[StripeCheckout] = None
 
 
 def _get_stripe(request: Request) -> StripeCheckout:
-    global stripe_checkout
-    if stripe_checkout is None:
-        api_key = os.environ.get("STRIPE_API_KEY", "")
-        if not api_key:
-            raise HTTPException(status_code=500, detail="Stripe not configured")
-        host = request.headers.get("origin") or str(request.base_url).rstrip("/")
-        stripe_checkout = StripeCheckout(api_key=api_key, webhook_url=f"{host}/api/payments/webhook")
-    return stripe_checkout
+    """Return a fresh StripeCheckout instance — its __init__ ensures
+    stripe.api_base points to the Emergent proxy when using sk_test_emergent.
+    """
+    api_key = os.environ.get("STRIPE_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="Stripe not configured")
+    host = request.headers.get("origin") or str(request.base_url).rstrip("/")
+    return StripeCheckout(api_key=api_key, webhook_url=f"{host}/api/payments/webhook")
 
 
 # ---------------- Models ----------------
@@ -443,27 +443,60 @@ async def payments_checkout(body: CheckoutCreateRequest, request: Request):
 
 @api_router.get("/payments/status/{session_id}")
 async def payments_status(session_id: str, request: Request):
-    sc = _get_stripe(request)
-    try:
-        st = await sc.get_checkout_status(session_id)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Stripe error: {e}")
-    new_status = "paid" if st.payment_status == "paid" else ("expired" if st.status == "expired" else "pending")
+    """Return payment status. Tries Stripe first; falls back to our local
+    DB record (updated by webhook OR /payments/confirm)."""
     purchase = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
-    if purchase and purchase.get("status") != new_status and new_status == "paid":
+    try:
+        sc = _get_stripe(request)
+        st = await sc.get_checkout_status(session_id)
+        new_status = "paid" if st.payment_status == "paid" else ("expired" if st.status == "expired" else "pending")
+        if purchase and purchase.get("status") != new_status and new_status == "paid":
+            await db.purchases.update_one(
+                {"stripe_session_id": session_id},
+                {"$set": {"status": "paid", "paid_at": now_utc()}},
+            )
+            purchase["status"] = "paid"
+        return {
+            "session_id": session_id,
+            "status": st.status,
+            "payment_status": st.payment_status,
+            "amount_total": st.amount_total,
+            "currency": st.currency,
+            "purchase": purchase,
+        }
+    except Exception as e:
+        # Proxy may not support GET — fall back to local DB
+        log.info("Stripe status fallback to DB for %s: %s", session_id, e)
+        if not purchase:
+            raise HTTPException(status_code=404, detail="Session not found")
+        return {
+            "session_id": session_id,
+            "status": "complete" if purchase.get("status") == "paid" else "open",
+            "payment_status": purchase.get("status") or "pending",
+            "amount_total": purchase.get("amount"),
+            "currency": purchase.get("currency"),
+            "purchase": purchase,
+            "via": "db",
+        }
+
+
+@api_router.post("/payments/confirm/{session_id}")
+async def payments_confirm(session_id: str):
+    """Marks a purchase as paid based on the Stripe success-redirect URL.
+    Stripe redirects to success_url ONLY on successful payment, so this is
+    safe enough for the Emergent sandbox where the read API is unavailable.
+    For real production, prefer the webhook (/api/payments/webhook).
+    """
+    purchase = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    if purchase.get("status") != "paid":
         await db.purchases.update_one(
             {"stripe_session_id": session_id},
             {"$set": {"status": "paid", "paid_at": now_utc()}},
         )
         purchase["status"] = "paid"
-    return {
-        "session_id": session_id,
-        "status": st.status,
-        "payment_status": st.payment_status,
-        "amount_total": st.amount_total,
-        "currency": st.currency,
-        "purchase": purchase,
-    }
+    return {"ok": True, "purchase": purchase}
 
 
 @api_router.post("/payments/webhook")

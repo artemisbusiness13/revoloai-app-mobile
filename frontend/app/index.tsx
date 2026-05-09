@@ -491,6 +491,28 @@ export default function Home() {
     })();
   }, []);
 
+  // Detect Stripe success / cancel redirect on web
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const paid = sp.get("paid");
+    const sess = sp.get("session");
+    const cancelled = sp.get("cancelled");
+    if (paid === "1" && sess) {
+      (async () => {
+        try {
+          await api(`/payments/confirm/${sess}`, { method: "POST" });
+          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+          reloadAccount();
+        } catch {}
+        // clean URL
+        window.history.replaceState({}, "", window.location.pathname);
+      })();
+    } else if (cancelled === "1") {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   const reloadAccount = useCallback(async () => {
     try {
       setAccountLoading(true);

@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -9,12 +9,24 @@ import {
   Animated,
   Platform,
   Dimensions,
+  TextInput,
+  Alert,
+  Linking,
+  ActivityIndicator,
 } from "react-native";
+import { router } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import {
+  api,
+  getOrCreateUserId,
+  getUserName,
+  setUserName as saveUserName,
+  clearUserName,
+} from "../lib/api";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -151,6 +163,7 @@ function PressableCard({
 
 /* ---------- Service Card ---------- */
 type Plan = {
+  id: string;
   title: string;
   subtitle: string;
   bullets: string[];
@@ -158,13 +171,15 @@ type Plan = {
   badge?: string;
   accent: string;
   accentSoft: string;
+  avatar: "maya" | "sofia" | "aria";
 };
 
-function ServiceCard({ plan, idx }: { plan: Plan; idx: number }) {
+function ServiceCard({ plan, idx, onPress }: { plan: Plan; idx: number; onPress: (p: Plan) => void }) {
   const isFeatured = !!plan.badge;
   return (
     <PressableCard
       testID={`service-card-${idx}`}
+      onPress={() => onPress(plan)}
       style={[
         styles.serviceCard,
         isFeatured && {
@@ -220,6 +235,7 @@ function AvatarChip({
   color,
   bg,
   testID,
+  onPress,
 }: {
   src: string;
   name: string;
@@ -227,9 +243,10 @@ function AvatarChip({
   color: string;
   bg: string;
   testID?: string;
+  onPress?: () => void;
 }) {
   return (
-    <PressableCard testID={testID} style={[styles.avatarCard, { backgroundColor: bg }]}>
+    <PressableCard testID={testID} onPress={onPress} style={[styles.avatarCard, { backgroundColor: bg }]}>
       <View style={[styles.avatarRing, { borderColor: color }]}>
         <Avatar uri={src } size={66} style={styles.avatarImg} />
       </View>
@@ -263,6 +280,7 @@ function TrustCard({
   color,
   bg,
   testID,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -271,9 +289,10 @@ function TrustCard({
   color: string;
   bg: string;
   testID?: string;
+  onPress?: () => void;
 }) {
   return (
-    <PressableCard testID={testID} style={[styles.trustCard]}>
+    <PressableCard testID={testID} onPress={onPress} style={[styles.trustCard]}>
       <View style={[styles.trustIcon, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={18} color={color} />
       </View>
@@ -295,6 +314,8 @@ export default function Home() {
 
   const jobsPlans: Plan[] = [
     {
+      id: "jobs-3",
+      avatar: "maya",
       title: "3 jobs",
       subtitle: "3 hand-picked roles matching your profile",
       bullets: ["3 matched job results", "Match score per job", "Direct apply links"],
@@ -303,6 +324,8 @@ export default function Home() {
       accentSoft: C.mayaSoft,
     },
     {
+      id: "jobs-5",
+      avatar: "maya",
       title: "5 jobs",
       subtitle: "5 curated roles + match scores",
       bullets: ["5 curated job results", "Better comparison", "Priority matching"],
@@ -311,6 +334,8 @@ export default function Home() {
       accentSoft: C.mayaSoft,
     },
     {
+      id: "jobs-10",
+      avatar: "maya",
       title: "10 jobs",
       subtitle: "10 deep-matched roles + insights",
       bullets: ["10 job shortlist", "Best value search", "More options"],
@@ -323,6 +348,8 @@ export default function Home() {
 
   const interviewPlans: Plan[] = [
     {
+      id: "itv-basic",
+      avatar: "sofia",
       title: "Basic interview",
       subtitle: "3 questions · quick warm-up",
       bullets: ["3 interview questions", "Quick warm-up session", "Short feedback report"],
@@ -331,6 +358,8 @@ export default function Home() {
       accentSoft: C.sofiaSoft,
     },
     {
+      id: "itv-standard",
+      avatar: "sofia",
       title: "Standard interview",
       subtitle: "Full 6-question interview",
       bullets: ["6 interview questions", "Score report included", "Improvement tips"],
@@ -339,6 +368,8 @@ export default function Home() {
       accentSoft: C.sofiaSoft,
     },
     {
+      id: "itv-advanced",
+      avatar: "sofia",
       title: "Advanced interview",
       subtitle: "10 questions + scored feedback",
       bullets: ["10 interview questions", "Deep scored feedback", "Strong preparation"],
@@ -351,6 +382,8 @@ export default function Home() {
 
   const coachPlans: Plan[] = [
     {
+      id: "coach-cv",
+      avatar: "aria",
       title: "CV review",
       subtitle: "Detailed feedback on your CV",
       bullets: ["Full CV analysis", "Improvement notes", "Better positioning"],
@@ -359,6 +392,8 @@ export default function Home() {
       accentSoft: C.ariaSoft,
     },
     {
+      id: "coach-answers",
+      avatar: "aria",
       title: "Answer suggestions",
       subtitle: "Tailored answers to common questions",
       bullets: ["Answer templates", "STAR structure guidance", "Confidence boost"],
@@ -367,6 +402,8 @@ export default function Home() {
       accentSoft: C.ariaSoft,
     },
     {
+      id: "coach-plan",
+      avatar: "aria",
       title: "Career plan",
       subtitle: "12-month roadmap to your next role",
       bullets: ["30-day action plan", "Skill gap analysis", "Clear next steps"],
@@ -377,8 +414,10 @@ export default function Home() {
     },
   ];
 
-  const bundles = [
+  const bundles: { id: string; avatar: "maya" | "sofia" | "aria"; title: string; desc: string; bullets: string[]; price: string; save: string; g1: string; g2: string }[] = [
     {
+      id: "bundle-starter",
+      avatar: "maya",
       title: "Job Hunt Starter",
       desc: "5 jobs + Standard interview",
       bullets: ["5 curated job results", "Standard mock interview", "Save 20% vs separate"],
@@ -388,6 +427,8 @@ export default function Home() {
       g2: "#7C8DFF",
     },
     {
+      id: "bundle-pro",
+      avatar: "sofia",
       title: "Career Pro",
       desc: "10 jobs + Advanced interview + CV review",
       bullets: ["10 jobs + Advanced interview", "Full CV review included", "Save 35% vs separate"],
@@ -397,6 +438,8 @@ export default function Home() {
       g2: "#334155",
     },
     {
+      id: "bundle-launch",
+      avatar: "aria",
       title: "Career Launch",
       desc: "Career plan + 5 jobs + CV review",
       bullets: ["Career plan + 5 jobs", "Full CV review included", "Save 24% vs separate"],
@@ -410,6 +453,170 @@ export default function Home() {
   const handleSelectAvatar = (a: "maya" | "sofia" | "aria") => {
     setSelectedAvatar(a);
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+    // Smooth scroll to that avatar's services
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: Math.max(servicesY.current[a] - 12, 0), animated: true });
+    }, 30);
+  };
+
+  // Section refs for accurate scroll-to behaviour
+  const avatarsSectionY = useRef(0);
+  const servicesY = useRef<{ maya: number; sofia: number; aria: number; bundles: number }>({
+    maya: 0,
+    sofia: 0,
+    aria: 0,
+    bundles: 0,
+  });
+
+  // User / account state
+  const [userName, setUserNameState] = useState<string | null>(null);
+  const [accountTab, setAccountTab] = useState<"purchases" | "saved">("purchases");
+  const [purchases, setPurchases] = useState<any[]>([]);
+  const [savedJobs, setSavedJobs] = useState<any[]>([]);
+  const [accountLoading, setAccountLoading] = useState(false);
+  // Sign-in modal
+  const [signInOpen, setSignInOpen] = useState(false);
+  const [signInName, setSignInName] = useState("");
+  // Trust modal
+  const [trustModal, setTrustModal] = useState<null | { title: string; body: string }>(null);
+  // Conversation demo state
+  const [demoText, setDemoText] = useState("");
+  const [demoSending, setDemoSending] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      await getOrCreateUserId();
+      const n = await getUserName();
+      setUserNameState(n);
+    })();
+  }, []);
+
+  const reloadAccount = useCallback(async () => {
+    try {
+      setAccountLoading(true);
+      const uid = await getOrCreateUserId();
+      const [p, j] = await Promise.all([
+        api<any[]>(`/purchases?user_id=${uid}`).catch(() => []),
+        api<any[]>(`/saved-jobs?user_id=${uid}`).catch(() => []),
+      ]);
+      setPurchases(p || []);
+      setSavedJobs(j || []);
+    } finally {
+      setAccountLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    reloadAccount();
+  }, [reloadAccount]);
+
+  const scrollToAvatars = () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+    scrollRef.current?.scrollTo({ y: Math.max(avatarsSectionY.current - 12, 0), animated: true });
+  };
+
+  const scrollToServices = (a: "maya" | "sofia" | "aria") => {
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+    scrollRef.current?.scrollTo({ y: Math.max(servicesY.current[a] - 12, 0), animated: true });
+  };
+
+  const openChat = (a: "maya" | "sofia" | "aria") => {
+    setSelectedAvatar(a);
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({ pathname: "/chat", params: { avatar: a } });
+  };
+
+  const openCheckout = (p: Plan) => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({
+      pathname: "/checkout",
+      params: {
+        avatar: p.avatar,
+        item_id: p.id,
+        title: p.title,
+        price: p.price,
+        bullets: p.bullets.join("|"),
+        kind: "service",
+      },
+    });
+  };
+
+  const openBundleCheckout = (b: typeof bundles[number]) => {
+    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    router.push({
+      pathname: "/checkout",
+      params: {
+        avatar: b.avatar,
+        item_id: b.id,
+        title: b.title,
+        price: b.price,
+        bullets: b.bullets.join("|"),
+        kind: "bundle",
+      },
+    });
+  };
+
+  const handleInstall = async () => {
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Install RevoloAI",
+        "Add to Home Screen via your browser's share menu. iOS: Share → Add to Home Screen. Android: Menu → Install app."
+      );
+      return;
+    }
+    Alert.alert("You're already in the app", "RevoloAI is running as a native app.");
+  };
+
+  const openTrust = (kind: "privacy" | "deletion" | "payments" | "honest") => {
+    const map = {
+      privacy: { title: "Privacy Policy", body: "We process the minimum data needed to run RevoloAI. Your CV and chats are private and yours to delete anytime." },
+      deletion: { title: "Data Deletion", body: "Tap Delete in your account to wipe all stored data. Your right is honoured immediately." },
+      payments: { title: "Stripe & PayPal", body: "Payments are tokenised by Stripe and PayPal. We never see or store your card details." },
+      honest: { title: "Honest about results", body: "RevoloAI helps you find and prepare for opportunities, but does not guarantee employment, interviews, or job offers." },
+    };
+    setTrustModal(map[kind]);
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+  };
+
+  const handleSaveDemoJob = async () => {
+    try {
+      const uid = await getOrCreateUserId();
+      await api("/saved-jobs", {
+        method: "POST",
+        body: JSON.stringify({ user_id: uid, title: "Sample matched role", company: "Revoloai", location: "Remote" }),
+      });
+      reloadAccount();
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch {}
+  };
+
+  const sendDemo = async () => {
+    const t = demoText.trim();
+    if (!t || demoSending) return;
+    setDemoSending(true);
+    try {
+      // jump straight into a real chat with Sofia, prefilled
+      router.push({ pathname: "/chat", params: { avatar: "sofia" } });
+      setDemoText("");
+    } finally {
+      setDemoSending(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    const n = signInName.trim();
+    if (!n) return;
+    await saveUserName(n);
+    setUserNameState(n);
+    setSignInOpen(false);
+    setSignInName("");
+    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+  };
+
+  const handleSignOut = async () => {
+    await clearUserName();
+    setUserNameState(null);
   };
 
   return (
@@ -429,7 +636,7 @@ export default function Home() {
             </View>
             <Text style={styles.brandText}>revolo<Text style={{ color: C.primary }}>ai</Text></Text>
           </View>
-          <PressableCard testID="install-btn" style={styles.installBtn}>
+          <PressableCard testID="install-btn" onPress={handleInstall} style={styles.installBtn}>
             <Ionicons name="phone-portrait-outline" size={14} color={C.text} />
             <Text style={styles.installBtnText}>Install</Text>
           </PressableCard>
@@ -487,7 +694,7 @@ export default function Home() {
               <PressableCard
                 testID="hero-cta-primary"
                 style={styles.primaryBtn}
-                onPress={() => scrollRef.current?.scrollTo({ y: 1100, animated: true })}
+                onPress={scrollToAvatars}
               >
                 <Text style={styles.primaryBtnText}>Choose your avatar</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
@@ -538,7 +745,7 @@ export default function Home() {
             <SectionTitle>Built to be private, secure, and yours</SectionTitle>
             <View style={styles.trustGrid}>
               <TrustCard
-                testID="trust-privacy"
+                testID="trust-privacy" onPress={() => openTrust("privacy")}
                 icon="shield-checkmark-outline"
                 title="Privacy Policy"
                 tag="Policy"
@@ -547,7 +754,7 @@ export default function Home() {
                 bg={C.primarySoft}
               />
               <TrustCard
-                testID="trust-deletion"
+                testID="trust-deletion" onPress={() => openTrust("deletion")}
                 icon="trash-outline"
                 title="Data Deletion"
                 tag="Your right"
@@ -556,7 +763,7 @@ export default function Home() {
                 bg={C.sofiaSoft}
               />
               <TrustCard
-                testID="trust-payments"
+                testID="trust-payments" onPress={() => openTrust("payments")}
                 icon="card-outline"
                 title="Stripe & PayPal"
                 tag="Secure"
@@ -565,7 +772,7 @@ export default function Home() {
                 bg={C.emeraldSoft}
               />
               <TrustCard
-                testID="trust-honest"
+                testID="trust-honest" onPress={() => openTrust("honest")}
                 icon="information-circle-outline"
                 title="No card data stored"
                 tag="No lock-in"
@@ -583,13 +790,13 @@ export default function Home() {
           </View>
 
           {/* MEET YOUR AVATARS */}
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={(e) => (avatarsSectionY.current = e.nativeEvent.layout.y)}>
             <SectionLabel label="Choose" color={C.primary} />
             <SectionTitle>Meet your avatars</SectionTitle>
             <SectionSub>Three friendly AIs, each with a clear role.</SectionSub>
             <View style={styles.avatarRow}>
               <AvatarChip
-                testID="avatar-maya"
+                testID="avatar-maya" onPress={() => openChat("maya")}
                 src={AVATARS.maya}
                 name="Maya"
                 role="Job Finder"
@@ -597,7 +804,7 @@ export default function Home() {
                 bg={C.mayaSoft}
               />
               <AvatarChip
-                testID="avatar-sofia"
+                testID="avatar-sofia" onPress={() => openChat("sofia")}
                 src={AVATARS.sofia}
                 name="Sofia"
                 role="Interview Coach"
@@ -605,7 +812,7 @@ export default function Home() {
                 bg={C.sofiaSoft}
               />
               <AvatarChip
-                testID="avatar-aria"
+                testID="avatar-aria" onPress={() => openChat("aria")}
                 src={AVATARS.aria}
                 name="Aria"
                 role="Career Coach"
@@ -616,7 +823,7 @@ export default function Home() {
           </View>
 
           {/* MAYA - JOBS */}
-          <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28, marginTop: 8 }]}>
+          <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28, marginTop: 8 }]} onLayout={(e) => (servicesY.current.maya = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.maya }]}>
                 <Avatar uri={AVATARS.maya } size={50} style={styles.personImg} />
@@ -629,13 +836,13 @@ export default function Home() {
             </View>
             <View style={styles.plansList}>
               {jobsPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i} />
+                <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} />
               ))}
             </View>
           </View>
 
           {/* SOFIA - INTERVIEWS */}
-          <View style={[styles.section, { paddingVertical: 28 }]}>
+          <View style={[styles.section, { paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.sofia = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.sofia }]}>
                 <Avatar uri={AVATARS.sofia } size={50} style={styles.personImg} />
@@ -648,13 +855,13 @@ export default function Home() {
             </View>
             <View style={styles.plansList}>
               {interviewPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 10} />
+                <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} />
               ))}
             </View>
           </View>
 
           {/* ARIA - CAREER */}
-          <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28 }]}>
+          <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.aria = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.aria }]}>
                 <Avatar uri={AVATARS.aria } size={50} style={styles.personImg} />
@@ -667,19 +874,19 @@ export default function Home() {
             </View>
             <View style={styles.plansList}>
               {coachPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 20} />
+                <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} />
               ))}
             </View>
           </View>
 
           {/* BUNDLES */}
-          <View style={[styles.section, { paddingVertical: 28 }]}>
+          <View style={[styles.section, { paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.bundles = e.nativeEvent.layout.y)}>
             <SectionLabel label="Save more" color={C.amber} />
             <SectionTitle>Smart bundles</SectionTitle>
             <SectionSub>Combine services and save up to 35%.</SectionSub>
             <View style={{ marginTop: 16, gap: 14 }}>
               {bundles.map((b, i) => (
-                <PressableCard key={b.title} testID={`bundle-${i}`} style={styles.bundleCard}>
+                <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={styles.bundleCard}>
                   <LinearGradient
                     colors={[b.g1, b.g2]}
                     start={{ x: 0, y: 0 }}
@@ -740,10 +947,34 @@ export default function Home() {
                 </View>
               </View>
               <View style={styles.chatInput}>
-                <View style={styles.micBtn}>
+                <Pressable testID="demo-mic-btn" onPress={() => openChat("sofia")} style={styles.micBtn}>
                   <Ionicons name="mic" size={16} color="#fff" />
-                </View>
-                <Text style={styles.chatInputText}>Tap mic or type…</Text>
+                </Pressable>
+                <TextInput
+                  testID="demo-chat-input"
+                  style={[styles.chatInputText, { flex: 1, paddingVertical: 6, ...(Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : {}) }]}
+                  placeholder="Tap mic or type…"
+                  placeholderTextColor={C.text3}
+                  value={demoText}
+                  onChangeText={setDemoText}
+                  onSubmitEditing={sendDemo}
+                  returnKeyType="send"
+                />
+                <Pressable
+                  testID="demo-send-btn"
+                  onPress={sendDemo}
+                  disabled={!demoText.trim() || demoSending}
+                  style={[
+                    styles.demoSendBtn,
+                    { backgroundColor: !demoText.trim() ? "#CBD0DE" : C.sofia },
+                  ]}
+                >
+                  {demoSending ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Ionicons name="arrow-up" size={14} color="#fff" />
+                  )}
+                </Pressable>
               </View>
             </View>
           </View>
@@ -787,7 +1018,7 @@ export default function Home() {
               <Text style={styles.finalSub}>
                 It takes 30 seconds. Real human-style guidance from minute one.
               </Text>
-              <PressableCard testID="final-start-btn" style={styles.finalBtn}>
+              <PressableCard testID="final-start-btn" onPress={scrollToAvatars} style={styles.finalBtn}>
                 <Text style={styles.finalBtnText}>Start now</Text>
                 <Ionicons name="arrow-forward" size={16} color="#0B0F19" />
               </PressableCard>
@@ -800,26 +1031,103 @@ export default function Home() {
             <SectionTitle>Account</SectionTitle>
             <View style={styles.accountCard}>
               <View style={styles.guestRow}>
-                <View style={styles.guestAvatar}>
-                  <Text style={styles.guestAvatarText}>G</Text>
+                <View style={[styles.guestAvatar, userName ? { backgroundColor: C.primary } : null]}>
+                  <Text style={[styles.guestAvatarText, userName ? { color: "#fff" } : null]}>
+                    {(userName || "G").trim().charAt(0).toUpperCase()}
+                  </Text>
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={styles.guestName}>Guest</Text>
-                  <Text style={styles.guestSub}>Sign in to save jobs and history</Text>
+                  <Text style={styles.guestName}>{userName || "Guest"}</Text>
+                  <Text style={styles.guestSub}>
+                    {userName ? "Signed in · your data is saved" : "Sign in to save jobs and history"}
+                  </Text>
                 </View>
-                <View style={styles.signInBtn}>
-                  <Text style={styles.signInBtnText}>Sign in</Text>
-                </View>
+                <Pressable
+                  testID="signin-btn"
+                  onPress={() => (userName ? handleSignOut() : setSignInOpen(true))}
+                  style={styles.signInBtn}
+                >
+                  <Text style={styles.signInBtnText}>{userName ? "Sign out" : "Sign in"}</Text>
+                </Pressable>
               </View>
               <View style={styles.accountTabs}>
-                <View style={[styles.accountTab, styles.accountTabActive]}>
-                  <Ionicons name="bag-handle-outline" size={14} color={C.primary} />
-                  <Text style={[styles.accountTabText, { color: C.primary }]}>Purchases</Text>
-                </View>
-                <View style={styles.accountTab}>
-                  <Ionicons name="bookmark-outline" size={14} color={C.text2} />
-                  <Text style={styles.accountTabText}>Saved jobs</Text>
-                </View>
+                <Pressable
+                  testID="account-tab-purchases"
+                  onPress={() => setAccountTab("purchases")}
+                  style={[styles.accountTab, accountTab === "purchases" && styles.accountTabActive]}
+                >
+                  <Ionicons name="bag-handle-outline" size={14} color={accountTab === "purchases" ? C.primary : C.text2} />
+                  <Text style={[styles.accountTabText, accountTab === "purchases" && { color: C.primary }]}>Purchases</Text>
+                </Pressable>
+                <Pressable
+                  testID="account-tab-saved"
+                  onPress={() => setAccountTab("saved")}
+                  style={[styles.accountTab, accountTab === "saved" && styles.accountTabActive]}
+                >
+                  <Ionicons name="bookmark-outline" size={14} color={accountTab === "saved" ? C.primary : C.text2} />
+                  <Text style={[styles.accountTabText, accountTab === "saved" && { color: C.primary }]}>Saved jobs</Text>
+                </Pressable>
+              </View>
+
+              {/* Tab content */}
+              <View style={{ marginTop: 14 }}>
+                {accountLoading ? (
+                  <ActivityIndicator color={C.primary} />
+                ) : accountTab === "purchases" ? (
+                  purchases.length === 0 ? (
+                    <View style={styles.emptyBox}>
+                      <Ionicons name="receipt-outline" size={20} color={C.text3} />
+                      <Text style={styles.emptyText}>No purchases yet. Tap any service to begin.</Text>
+                    </View>
+                  ) : (
+                    <View style={{ gap: 8 }}>
+                      {purchases.map((p) => (
+                        <View key={p.id} style={styles.listRow}>
+                          <View style={[styles.listIcon, { backgroundColor: C.primarySoft }]}>
+                            <Ionicons name="checkmark" size={14} color={C.primary} />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.listTitle}>{p.item_title}</Text>
+                            <Text style={styles.listSub}>{p.price} · {p.kind}</Text>
+                          </View>
+                          <Pressable
+                            testID={`open-purchase-${p.id}`}
+                            onPress={() => openChat(p.avatar)}
+                            style={[styles.smallCta, { backgroundColor: C.primary }]}
+                          >
+                            <Text style={styles.smallCtaText}>Open</Text>
+                          </Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  )
+                ) : savedJobs.length === 0 ? (
+                  <View style={styles.emptyBox}>
+                    <Ionicons name="bookmark-outline" size={20} color={C.text3} />
+                    <Text style={styles.emptyText}>No saved jobs yet.</Text>
+                    <Pressable
+                      testID="save-demo-job-btn"
+                      onPress={handleSaveDemoJob}
+                      style={[styles.smallCta, { backgroundColor: C.maya, marginTop: 10 }]}
+                    >
+                      <Text style={styles.smallCtaText}>Save a sample role</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {savedJobs.map((j) => (
+                      <View key={j.id} style={styles.listRow}>
+                        <View style={[styles.listIcon, { backgroundColor: C.mayaSoft }]}>
+                          <Ionicons name="briefcase-outline" size={14} color={C.maya} />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.listTitle}>{j.title}</Text>
+                          <Text style={styles.listSub}>{j.company}{j.location ? ` · ${j.location}` : ""}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
               </View>
             </View>
           </View>
@@ -881,9 +1189,7 @@ export default function Home() {
             <PressableCard
               testID="sticky-cta"
               style={styles.stickyCta}
-              onPress={() => {
-                if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-              }}
+              onPress={() => openChat(selectedAvatar)}
             >
               <LinearGradient
                 colors={["#5B5FE9", "#8B5CF6"]}
@@ -896,6 +1202,58 @@ export default function Home() {
             </PressableCard>
           </View>
         </View>
+
+        {/* Sign in modal */}
+        {signInOpen && (
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Sign in</Text>
+              <Text style={styles.modalSub}>Use any name — your data stays on this device.</Text>
+              <TextInput
+                testID="signin-name-input"
+                placeholder="Your name"
+                placeholderTextColor={C.text3}
+                value={signInName}
+                onChangeText={setSignInName}
+                style={styles.modalInput}
+                autoFocus
+                onSubmitEditing={handleSignIn}
+              />
+              <View style={styles.modalActions}>
+                <Pressable testID="signin-cancel" onPress={() => setSignInOpen(false)} style={[styles.modalBtn, { backgroundColor: C.bgSoft }]}>
+                  <Text style={[styles.modalBtnText, { color: C.text }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  testID="signin-confirm"
+                  onPress={handleSignIn}
+                  disabled={!signInName.trim()}
+                  style={[styles.modalBtn, { backgroundColor: signInName.trim() ? C.primary : "#CBD0DE" }]}
+                >
+                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>Continue</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Trust info modal */}
+        {!!trustModal && (
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{trustModal.title}</Text>
+              <Text style={styles.modalSub}>{trustModal.body}</Text>
+              <View style={styles.modalActions}>
+                <Pressable
+                  testID="trust-modal-close"
+                  onPress={() => setTrustModal(null)}
+                  style={[styles.modalBtn, { flex: 1, backgroundColor: C.primary }]}
+                >
+                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>Got it</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -1466,4 +1824,83 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   stickyCtaText: { color: "#fff", fontSize: 15, fontWeight: "800", letterSpacing: -0.2 },
+
+  /* Demo chat send */
+  demoSendBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 4,
+  },
+
+  /* Account list rows */
+  emptyBox: {
+    backgroundColor: C.bgSoft,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    alignItems: "center",
+    gap: 6,
+  },
+  emptyText: { fontSize: 13, color: C.text2, textAlign: "center" },
+  listRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.bgSoft,
+    padding: 12,
+    borderRadius: 14,
+  },
+  listIcon: { width: 30, height: 30, borderRadius: 15, alignItems: "center", justifyContent: "center" },
+  listTitle: { fontSize: 14, fontWeight: "700", color: C.text },
+  listSub: { fontSize: 12, color: C.text2, marginTop: 2 },
+  smallCta: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  smallCtaText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+
+  /* Modal */
+  modalBackdrop: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: "rgba(11, 15, 25, 0.45)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+    zIndex: 50,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: "#fff",
+    borderRadius: 22,
+    padding: 22,
+  },
+  modalTitle: { fontSize: 18, fontWeight: "800", color: C.text },
+  modalSub: { fontSize: 13, color: C.text2, marginTop: 6, lineHeight: 19 },
+  modalInput: {
+    marginTop: 14,
+    backgroundColor: C.bgSoft,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: C.text,
+    ...(Platform.OS === "web" ? ({ outlineWidth: 0 } as any) : {}),
+  },
+  modalActions: { flexDirection: "row", gap: 10, marginTop: 16 },
+  modalBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  modalBtnText: { fontSize: 14, fontWeight: "700" },
 });

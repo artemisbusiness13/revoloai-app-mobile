@@ -12,9 +12,13 @@ export default function RootLayout() {
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: "#FAFAFA" },
-            animation: "fade",
+            animation: "slide_from_right",
           }}
-        />
+        >
+          <Stack.Screen name="index" />
+          <Stack.Screen name="chat" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+          <Stack.Screen name="checkout" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

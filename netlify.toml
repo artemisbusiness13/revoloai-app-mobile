@@ -15,7 +15,12 @@
 [build.environment]
   NODE_VERSION = "20"
   YARN_VERSION = "1.22.22"
-  # Set EXPO_PUBLIC_BACKEND_URL in the Netlify UI, NOT here.
+  # Production backend URL — baked into the JS bundle at build time.
+  # Override via Netlify UI → Site settings → Environment variables if needed.
+  EXPO_PUBLIC_BACKEND_URL = "https://bilingual-ai-coach-1.preview.emergentagent.com"
+  # Force a clean Metro cache on every Netlify build so env var changes are picked up.
+  EXPO_NO_CACHE = "1"
+  CI = "true"
 
 # SPA fallback — every unknown route serves the SPA shell
 [[redirects]]

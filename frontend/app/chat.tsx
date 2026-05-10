@@ -364,56 +364,27 @@ export default function ChatScreen() {
             )}
           </ScrollView>
 
-          {/* Suggestions */}
-          {!!suggestions.length && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[styles.suggRow, Platform.OS === "web" && ({ direction: "ltr" } as any)]}
-            >
-              {(key === "maya" || key === "sofia") && (
-                <Pressable
-                  testID={key === "maya" ? "chat-find-jobs" : "chat-start-interview"}
-                  onPress={key === "maya" ? findJobs : startInterview}
-                  style={[styles.suggChip, { backgroundColor: meta.color, borderColor: meta.color }]}
-                  disabled={matching}
-                >
-                  {matching ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <Ionicons
-                      name={key === "maya" ? "briefcase" : "play"}
-                      size={12}
-                      color="#fff"
-                    />
-                  )}
-                  <Text style={[styles.suggText, { color: "#fff" }]}>
-                    {key === "maya" ? t("chat.findJobs") : t("chat.startInterview")}
-                  </Text>
-                </Pressable>
-              )}
-              {suggestions.map((s, i) => (
-                <Pressable
-                  key={s + i}
-                  testID={`chat-suggestion-${i}`}
-                  onPress={() => send(s)}
-                  style={[styles.suggChip, { borderColor: meta.color }]}
-                >
-                  <Ionicons name="sparkles-outline" size={12} color={meta.color} />
-                  <Text style={[styles.suggText, { color: meta.color }]}>{s}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          )}
+          {/* Suggestions removed — chat stays clean & conversational */}
 
           {/* Input */}
           <View style={[styles.inputRow, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
             <Pressable
               testID="chat-mic-btn"
               onPress={onMic}
-              style={[styles.micBtn, { backgroundColor: listening ? meta.color : "#F2F3F7" }]}
+              accessibilityLabel={listening ? t("chat.listening") : (vSupport.stt || Platform.OS !== "web" ? "Voice input" : t("chat.voiceUnsupported"))}
+              style={[
+                styles.micBtn,
+                {
+                  backgroundColor: listening ? meta.color : "#F2F3F7",
+                  opacity: !vSupport.stt && Platform.OS === "web" ? 0.55 : 1,
+                },
+              ]}
             >
-              <Ionicons name={listening ? "radio" : "mic"} size={18} color={listening ? "#fff" : meta.color} />
+              <Ionicons
+                name={listening ? "radio" : (vSupport.stt || Platform.OS !== "web" ? "mic" : "mic-off")}
+                size={18}
+                color={listening ? "#fff" : meta.color}
+              />
             </Pressable>
             <TextInput
               testID="chat-input"

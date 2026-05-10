@@ -354,6 +354,15 @@ agent_communication:
         New backend testing required: Multilingual chat language directive for 4 newly added languages — Polish (pl), Spanish (es), Punjabi (pa), Urdu (ur) — plus EN/RO regression. The frontend now supports 6 total languages and forwards `lang` (English-language name like "Polish"/"Urdu") to /api/chat for every user message. The backend personalisation builds a system prompt that includes a strict LANGUAGE directive. Please run the 8 scenarios listed in the task "Multilingual chat language directive (PL/ES/PA/UR + EN/RO)". Do NOT re-test other endpoints. Use any test user_id (no purchases required — basic tier is fine). The hostname for testing is the public ingress URL.
     - agent: "testing"
       message: |
+        Multilingual chat directive backend suite executed against the public ingress URL. **8/8 PASS** — Polish/Spanish/Punjabi/Urdu/English/Romanian/Default/Multi-turn-Polish all produce replies in the requested language. Claude (sonnet-4-5) honours the LANGUAGE directive end-to-end. No issues found.
+    - agent: "testing"
+      message: |
+        Frontend voice + multilingual suite executed (mobile 390x844). PASS results: language selector (6 chips visible), Urdu chat (Maya, Arabic-script reply confirmed), AI bubble computed style `direction: rtl`, speaker toggle defaults OFF + persists across reload via `localStorage['revolo.voice.speaker']`, TTS auto-play gating verified (0 calls when typed input regardless of speaker state), TTS fallback safe when `speechSynthesis` undefined, mic button renders + tappable, auth/profile regression (signup→/profile→home shows Sign out + reload persistence). One concern flagged: chat header/input-row appeared mirrored at the harness's wide viewport — recommended locking `direction: ltr` on those containers as a defensive measure.
+    - agent: "main"
+      message: |
+        Applied defensive fix in /app/frontend/app/chat.tsx: added `direction: "ltr"` (web-only) to the header `<View>`, input-row `<View>`, and suggestion-row contentContainer so that Urdu RTL mode only flips the inline text inside chat bubbles/input (per user requirement) but never the layout. Manually verified on mobile viewport: back chevron stays LEFT, speaker/info stay RIGHT, mic stays LEFT, send stays RIGHT. Layout is now stable regardless of `<html dir="rtl">`. No other code changes — speaker toggle, TTS gating, mic STT, multilingual chips and auth regressions remain as previously tested.
+    - agent: "testing"
+      message: |
         Multilingual chat language directive suite executed via /app/backend_test.py against the public ingress URL — ALL 8/8 SCENARIOS PASS.
           (1) Polish (sofia) — PL chars + words present, no English dominance. PASS
           (2) Spanish (maya) — Spanish chars (í, ñ, ¿, ¡) + words (trabajo, senior). PASS

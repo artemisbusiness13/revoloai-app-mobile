@@ -286,7 +286,7 @@ export default function ChatScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: meta.soft }]}>
+        <View style={[styles.header, { borderBottomColor: meta.soft }, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
           <Pressable
             testID="chat-close-btn"
             onPress={() => router.back()}
@@ -369,7 +369,7 @@ export default function ChatScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.suggRow}
+              contentContainerStyle={[styles.suggRow, Platform.OS === "web" && ({ direction: "ltr" } as any)]}
             >
               {(key === "maya" || key === "sofia") && (
                 <Pressable
@@ -407,7 +407,7 @@ export default function ChatScreen() {
           )}
 
           {/* Input */}
-          <View style={styles.inputRow}>
+          <View style={[styles.inputRow, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
             <Pressable
               testID="chat-mic-btn"
               onPress={onMic}

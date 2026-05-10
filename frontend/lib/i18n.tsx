@@ -1,17 +1,26 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import en from "./translations/en";
 import ro from "./translations/ro";
+import pl from "./translations/pl";
+import es from "./translations/es";
+import pa from "./translations/pa";
+import ur from "./translations/ur";
 import { Translations } from "./translations/types";
 
-const DICTS: Record<string, Translations> = { en, ro };
+const DICTS: Record<string, Translations> = { en, ro, pl, es, pa, ur };
 const STORAGE_KEY = "revolo.lang";
 
 export type LangCode = keyof typeof DICTS;
 
-export const SUPPORTED_LANGS: { code: LangCode; name: string; native: string }[] = [
-  { code: "en", name: "English", native: "English" },
-  { code: "ro", name: "Romanian", native: "Română" },
+export const SUPPORTED_LANGS: { code: LangCode; name: string; native: string; dir: "ltr" | "rtl" }[] = [
+  { code: "en", name: "English",  native: "English",  dir: "ltr" },
+  { code: "ro", name: "Romanian", native: "Română",   dir: "ltr" },
+  { code: "pl", name: "Polish",   native: "Polski",   dir: "ltr" },
+  { code: "es", name: "Spanish",  native: "Español",  dir: "ltr" },
+  { code: "pa", name: "Punjabi",  native: "ਪੰਜਾਬੀ",     dir: "ltr" },
+  { code: "ur", name: "Urdu",     native: "اردو",      dir: "rtl" },
 ];
 
 type Ctx = {
@@ -52,7 +61,26 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     if (!(l in DICTS)) return;
     setLangState(l);
     try { await AsyncStorage.setItem(STORAGE_KEY, l); } catch {}
+    // Apply RTL direction on web for Urdu (and any future RTL locale)
+    if (Platform.OS === "web") {
+      try {
+        const dir = SUPPORTED_LANGS.find((s) => s.code === l)?.dir || "ltr";
+        if (typeof document !== "undefined") {
+          document.documentElement.setAttribute("dir", dir);
+          document.documentElement.setAttribute("lang", String(l));
+        }
+      } catch {}
+    }
   }, []);
+
+  // On boot, also apply dir/lang attributes for the loaded language
+  useEffect(() => {
+    if (Platform.OS === "web" && typeof document !== "undefined") {
+      const dir = SUPPORTED_LANGS.find((s) => s.code === lang)?.dir || "ltr";
+      document.documentElement.setAttribute("dir", dir);
+      document.documentElement.setAttribute("lang", String(lang));
+    }
+  }, [lang]);
 
   const dict = DICTS[lang] || DICTS.en;
 

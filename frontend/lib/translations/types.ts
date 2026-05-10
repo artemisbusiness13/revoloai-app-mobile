@@ -29,6 +29,7 @@ export type Translations = {
     axes: Record<string, string>;
   };
   demo: Record<string, string>;
+  profile: Record<string, string>;
   legal: Record<
     "privacy" | "terms" | "cookies" | "deletion",
     {

@@ -105,6 +105,57 @@
 user_problem_statement: "Stabilise the EN + RO bilingual experience across UI, chat, interview flow, results, radar chart legends, pricing and legal pages. Do not add other languages yet."
 
 backend:
+  - task: "User signup/login + Profile CRUD + Personalisation injection (chat/interview)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py, /app/backend/services/auth.py, /app/backend/services/personalization.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Major upgrade. Added (a) Auth: POST /api/auth/signup (name+email+password, bcrypt, returns opaque session token), POST /api/auth/login, GET /api/auth/me (Bearer), POST /api/auth/logout. (b) Profile: expanded ProfileIn pydantic to 23 fields (target_role, seniority, years_experience, location, remote, salary_min/max, skills[], languages[], qualifications[], education, experience_summary, industries[], industries_avoid[], strengths[], weaknesses[], availability, cv_text, cv_filename, notes, must_haves[], nice_to_haves[], summary). PUT /api/profile/{user_id} sets completed=true when target_role is set. (c) Personalisation: services/personalization.py — profile_block() renders compact bullet list; tier_block() injects active package tier (basic/standard/premium derived from most recent paid purchase per avatar) + per-tier limits (job_matches: 3/5/10, interview_questions: 3/5/8, feedback_depth: short/medium/deep). Chat endpoint now builds personalised system prompt = persona + lang + tier + profile + behavioural directive. Interview/start now passes profile_block + clamps total_questions to tier cap. (d) GET /api/account/tier?user_id&avatar exposes resolved tier+limits. Smoke-tested via curl: signup→login→put profile→empty-message chat to Sofia returned a personal greeting using user's name AND a senior-product-designer-specific question — no scripted text.
+            
+            Required tests:
+            (1) POST /api/auth/signup with valid {name,email,password}: 200, ok=true, token+user, profile_completed=false.
+            (2) Same email twice: 409 conflict.
+            (3) Password < 6 chars: 400. Missing fields: 400.
+            (4) POST /api/auth/login right creds: 200; wrong creds: 401.
+            (5) GET /api/auth/me with valid Bearer: returns user+profile+profile_completed. Bad token: 401.
+            (6) POST /api/auth/logout invalidates token (subsequent /auth/me → 401).
+            (7) PUT /api/profile/{user_id} with full body returns saved profile; subsequent GET returns same.
+            (8) PUT a profile with target_role set, then GET /auth/me — profile_completed=true.
+            (9) POST /api/chat with a real user_id whose profile has target_role/skills — reply must reference at least the target_role or skills (verifies profile_block injection).
+            (10) POST /api/interview/start with role/seniority + a user_id with profile — initial question role-specific (NOT generic). total_questions capped at tier (3 for basic).
+            (11) GET /api/account/tier: no purchases → basic; after seeding paid purchase with item_id=itv-standard for that user → standard with limits.interview_questions=5.
+            (12) Regression: existing /api/jobs/match still works with new ProfileIn schema (extra fields don't break).
+        - working: true
+          agent: "testing"
+          comment: |
+            All 12 review scenarios PASS via /app/backend_test.py against the public ingress URL (21/21 assertions green). Detailed results:
+            (1) POST /api/auth/signup with valid {name,email,password} → 200 with ok:true, token, user.user_id starting with "u_" (e.g. u_0bc9ddc4658b45), user.email lowercased, user.name preserved, profile_completed:false. PASS
+            (2) Same email twice → HTTP 409 with detail "email already registered". PASS
+            (3a) password="abc" (5 chars) → HTTP 400 with detail "password must be at least 6 characters". PASS
+            (3b) Empty name OR empty email → HTTP 400 each. PASS
+            (3c) email="notanemail" → HTTP 400 with detail "invalid email". PASS
+            (4a) POST /api/auth/login with right creds → 200 with NEW token (different from signup token), user_id matches. PASS
+            (4b) Wrong password → HTTP 401 with detail "invalid email or password". PASS
+            (4c) Non-existent email → HTTP 401. PASS
+            (5a) GET /api/auth/me with valid Bearer → 200 with user (no password_hash field), profile dict, profile_completed:false. PASS
+            (5b) Bad token → HTTP 401. PASS
+            (5c) No Authorization header → HTTP 401. PASS
+            (6) POST /api/auth/logout (200) → immediately GET /api/auth/me with same token → HTTP 401 (token revoked). PASS
+            (7) PUT /api/profile/{user_id} with all 23 fields populated → 200 with all fields persisted exactly (target_role, seniority, years_experience, location, remote, salary_min/max, skills[], languages[], qualifications[], education, experience_summary, industries[], industries_avoid[], strengths[], weaknesses[], availability, cv_text, cv_filename, notes, must_haves[], nice_to_haves[], summary). Subsequent GET /api/profile/{user_id} returns identical values. completed flag set to true. PASS
+            (8) GET /api/auth/me using login token after PUT → profile_completed:true (target_role triggers completion). PASS
+            (9) POST /api/chat with sofia → personalised reply (640 chars) referencing "Senior Product Designer", "design system scale-up (60+...)", and the user's name "Priya". POST /api/chat with aria → personalised reply (567 chars) referencing CV bullets and design leadership. Both contain the expected substrings (design / Figma / Senior Product Designer / Leadership). PASS
+            (10) POST /api/interview/start with role="Senior Product Designer", seniority="senior", total_questions=8 → 200 with current=1, total=3 (correctly clamped to basic-tier cap), tier="basic". Question is role-specific: "Can you describe a challenging design problem you encountered while leading design at your previous SaaS startups, and how you approached solving it?" — generic fallback "Tell me about yourself" is absent. PASS
+            (11a) GET /api/account/tier?user_id=<no-purchases>&avatar=sofia → tier:"basic", limits.interview_questions=3, limits.job_matches=3. PASS
+            (11b) After POST /api/demo/seed (which inserts paid purchases for itv-standard + jobs-5): GET /api/account/tier?...&avatar=sofia → tier:"standard", limits.interview_questions=5; &avatar=maya → tier:"standard", limits.job_matches=5. PASS (cleanup via /api/demo/reset confirmed).
+            (12) POST /api/jobs/match with the 23-field profile user → 200 with matches[] (5 matches from curated pool fallback, live=False). New ProfileIn schema doesn't break the endpoint. PASS
+            No issues found. The auth/profile/personalisation upgrade is fully functional end to end.
+
   - task: "Plumb `lang` into Interview start & answer endpoints"
     implemented: true
     working: true
@@ -155,15 +206,18 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "User signup/login + Profile CRUD + Personalisation injection (chat/interview)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
     - agent: "main"
-      message: "Added preview/demo mode. Backend: POST /api/demo/seed and POST /api/demo/reset. Please verify: (a) /api/demo/seed with valid user_id returns ok=true and counts {saved_jobs:3, purchases:2}; (b) following /api/saved-jobs?user_id=X returns 3 rows tagged is_demo:true; (c) /api/purchases?user_id=X returns 2 rows with status='paid' tagged is_demo:true; (d) calling /api/demo/seed twice yields the same totals (idempotent — must NOT duplicate rows); (e) /api/demo/reset wipes only the is_demo rows; (f) both endpoints return 400 when user_id missing/empty. Do NOT retest other endpoints — they are out of scope."
+      message: "Personalisation upgrade. New endpoints under /api/auth (signup/login/me/logout, bcrypt + opaque session tokens), expanded ProfileIn (23 fields incl. CV paste, strengths, weaknesses, industries, languages, qualifications), and personalisation injection (services/personalization.py) into chat & interview prompts. Tier resolves per-avatar from most recent paid purchase (item_id → basic/standard/premium). New /api/account/tier helper. Please run the 12-step plan in the task. Out-of-scope: jobs/match, saved-jobs, purchases, payments/checkout, demo/seed — do NOT retest those."
     - agent: "testing"
       message: "Backend bilingual EN+RO suite executed successfully via /app/backend_test.py against the public ingress URL. 6/6 tests PASS. The pydantic `lang` plumbing is fully working. No issues found."
     - agent: "testing"
       message: "Demo seed/reset suite executed via /app/backend_test.py against the public ingress URL. All 7 review scenarios (a)-(g) PASS — 10/10 assertions green. /api/demo/seed seeds exactly 3 saved_jobs (Senior Product Designer / Customer Success Manager / Data Analyst, all is_demo:true with title/company/location) and 2 purchases (status=paid, currency=gbp, amounts 899 & 699 in pence, avatars sofia & maya). Idempotency confirmed — re-seeding the same user_id keeps totals at 3 and 2 (no duplication; old demo rows are wiped first). /api/demo/reset returns ok=true with purchases_removed=2 and saved_jobs_removed=3, and subsequent GETs return 0 rows. Both endpoints correctly return HTTP 400 with detail='user_id required' on empty body. Isolation verified: a manually-saved non-demo job 'My real job' for demo_iso_A survives /api/demo/reset while the 3 demo rows are removed. No issues found."
+    - agent: "testing"
+      message: "Auth + Profile CRUD + Personalisation suite executed via /app/backend_test.py against the public ingress URL. All 12 review scenarios PASS (21/21 assertions green). Highlights: (1) signup returns ok:true + opaque token + user with user_id starting 'u_' + lowercased email + profile_completed:false. (2) duplicate email → 409 'email already registered'. (3) password<6 chars → 400; empty name/email → 400; invalid email → 400 'invalid email'. (4) login correct creds → 200 with NEW token; wrong pwd → 401; unknown email → 401. (5) /auth/me valid bearer returns user (no password_hash) + profile + profile_completed:false; bad token → 401; no header → 401. (6) /auth/logout invalidates the token (subsequent /auth/me → 401). (7) PUT /profile/{user_id} with all 23 fields persists every field exactly; GET returns same. (8) After PUT with target_role set, /auth/me returns profile_completed:true. (9) /chat (sofia & aria) replies are personalised — Sofia greets 'Priya' and references Senior Product Designer + design system scale-up; Aria references CV bullets and design leadership. Both contain expected substrings. (10) /interview/start with total_questions=8 correctly clamps to total=3 (basic-tier cap) and tier='basic'; the opening question is role-specific (no 'Tell me about yourself' fallback). (11a) /account/tier no-purchase user → tier:'basic', limits.interview_questions=3. (11b) After /demo/seed, /account/tier?avatar=sofia → tier:'standard', interview_questions=5; ?avatar=maya → tier:'standard', job_matches=5. (12) /jobs/match regression with new ProfileIn schema → 200 with matches[5]. No issues found — the auth/profile/personalisation upgrade is fully working end to end."

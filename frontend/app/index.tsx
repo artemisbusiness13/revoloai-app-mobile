@@ -29,6 +29,8 @@ import {
 } from "../lib/api";
 import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
+import { useAuth } from "../lib/auth";
+import { router } from "expo-router";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -311,6 +313,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const { t, tArr, lang, setLang, langName } = useI18n();
   const { isDemo, enableDemo, refreshTick } = useDemo();
+  const auth = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<"maya" | "sofia" | "aria">("sofia");
 
@@ -403,7 +406,12 @@ export default function Home() {
   const [accountLoading, setAccountLoading] = useState(false);
   // Sign-in modal
   const [signInOpen, setSignInOpen] = useState(false);
+  const [signInMode, setSignInMode] = useState<"signup" | "login">("signup");
   const [signInName, setSignInName] = useState("");
+  const [signInEmail, setSignInEmail] = useState("");
+  const [signInPwd, setSignInPwd] = useState("");
+  const [signInBusy, setSignInBusy] = useState(false);
+  const [signInErr, setSignInErr] = useState<string | null>(null);
   // Trust modal
   const [trustModal, setTrustModal] = useState<null | { title: string; body: string }>(null);
   // Conversation demo state
@@ -567,16 +575,52 @@ export default function Home() {
   };
 
   const handleSignIn = async () => {
-    const n = signInName.trim();
-    if (!n) return;
-    await saveUserName(n);
-    setUserNameState(n);
-    setSignInOpen(false);
-    setSignInName("");
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    setSignInErr(null);
+    setSignInBusy(true);
+    try {
+      if (signInMode === "signup") {
+        if (!signInName.trim() || !signInEmail.trim() || !signInPwd) {
+          setSignInErr(t("account.fillAll"));
+          return;
+        }
+        const r = await auth.signup(signInName.trim(), signInEmail.trim(), signInPwd);
+        if (!r.ok) {
+          setSignInErr(r.error || t("account.signupFailed"));
+          return;
+        }
+        // Sync legacy AsyncStorage name + user_id
+        await saveUserName(signInName.trim());
+        setUserNameState(signInName.trim());
+        setSignInOpen(false);
+        setSignInName(""); setSignInEmail(""); setSignInPwd("");
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        // Send the user to fill their profile (mandatory onboarding)
+        router.push("/profile");
+      } else {
+        if (!signInEmail.trim() || !signInPwd) {
+          setSignInErr(t("account.fillAll"));
+          return;
+        }
+        const r = await auth.login(signInEmail.trim(), signInPwd);
+        if (!r.ok) {
+          setSignInErr(r.error || t("account.loginFailed"));
+          return;
+        }
+        await saveUserName(r ? (auth.user?.name || signInEmail.trim()) : signInEmail.trim());
+        setUserNameState(auth.user?.name || signInEmail.trim());
+        setSignInOpen(false);
+        setSignInName(""); setSignInEmail(""); setSignInPwd("");
+        if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        // If profile not completed yet, push to profile
+        if (!auth.profileCompleted) router.push("/profile");
+      }
+    } finally {
+      setSignInBusy(false);
+    }
   };
 
   const handleSignOut = async () => {
+    await auth.logout();
     await clearUserName();
     setUserNameState(null);
   };
@@ -1177,18 +1221,57 @@ export default function Home() {
         {signInOpen && (
           <View style={styles.modalBackdrop}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>{t("account.signInTitle")}</Text>
-              <Text style={styles.modalSub}>{t("account.signInSub")}</Text>
+              <Text style={styles.modalTitle}>
+                {signInMode === "signup" ? t("account.signupTitle") : t("account.loginTitle")}
+              </Text>
+              <Text style={styles.modalSub}>
+                {signInMode === "signup" ? t("account.signupSub") : t("account.loginSub")}
+              </Text>
+
+              <View style={{ flexDirection: "row", marginTop: 12, marginBottom: 8 }}>
+                <Pressable onPress={() => setSignInMode("signup")} style={[styles.tabBtn, signInMode === "signup" && styles.tabBtnOn]}>
+                  <Text style={[styles.tabBtnText, signInMode === "signup" && styles.tabBtnTextOn]}>{t("account.signupTab")}</Text>
+                </Pressable>
+                <Pressable onPress={() => setSignInMode("login")} style={[styles.tabBtn, signInMode === "login" && styles.tabBtnOn]}>
+                  <Text style={[styles.tabBtnText, signInMode === "login" && styles.tabBtnTextOn]}>{t("account.loginTab")}</Text>
+                </Pressable>
+              </View>
+
+              {signInMode === "signup" && (
+                <TextInput
+                  testID="signin-name-input"
+                  placeholder={t("account.namePh")}
+                  placeholderTextColor={C.text3}
+                  value={signInName}
+                  onChangeText={setSignInName}
+                  style={styles.modalInput}
+                  autoFocus
+                />
+              )}
               <TextInput
-                testID="signin-name-input"
-                placeholder={t("account.namePh")}
+                testID="signin-email-input"
+                placeholder={t("account.emailPh")}
                 placeholderTextColor={C.text3}
-                value={signInName}
-                onChangeText={setSignInName}
-                style={styles.modalInput}
-                autoFocus
+                value={signInEmail}
+                onChangeText={setSignInEmail}
+                style={[styles.modalInput, { marginTop: 8 }]}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoFocus={signInMode === "login"}
+              />
+              <TextInput
+                testID="signin-password-input"
+                placeholder={t("account.passwordPh")}
+                placeholderTextColor={C.text3}
+                value={signInPwd}
+                onChangeText={setSignInPwd}
+                secureTextEntry
+                style={[styles.modalInput, { marginTop: 8 }]}
                 onSubmitEditing={handleSignIn}
               />
+
+              {signInErr ? <Text style={styles.errText}>{signInErr}</Text> : null}
+
               <Pressable
                 testID="signin-try-demo"
                 onPress={async () => {
@@ -1209,10 +1292,14 @@ export default function Home() {
                 <Pressable
                   testID="signin-confirm"
                   onPress={handleSignIn}
-                  disabled={!signInName.trim()}
-                  style={[styles.modalBtn, { backgroundColor: signInName.trim() ? C.primary : "#CBD0DE" }]}
+                  disabled={signInBusy}
+                  style={[styles.modalBtn, { backgroundColor: signInBusy ? "#CBD0DE" : C.primary }]}
                 >
-                  <Text style={[styles.modalBtnText, { color: "#fff" }]}>{t("common.continue")}</Text>
+                  {signInBusy ? <ActivityIndicator color="#fff" /> : (
+                    <Text style={[styles.modalBtnText, { color: "#fff" }]}>
+                      {signInMode === "signup" ? t("account.createAccount") : t("account.logIn")}
+                    </Text>
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -1892,6 +1979,11 @@ const styles = StyleSheet.create({
     borderColor: C.emerald + "33",
   },
   demoTryText: { fontSize: 13, fontWeight: "700", color: C.emerald },
+  tabBtn: { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 10, backgroundColor: C.bgSoft },
+  tabBtnOn: { backgroundColor: C.primarySoft },
+  tabBtnText: { fontSize: 12, fontWeight: "700", color: C.text2 },
+  tabBtnTextOn: { color: C.primary },
+  errText: { fontSize: 12, color: "#DC2626", marginTop: 8 },
   modalBtn: {
     flex: 1,
     paddingVertical: 12,

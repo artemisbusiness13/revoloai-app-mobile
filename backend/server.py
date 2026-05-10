@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Header
 from fastapi.responses import FileResponse, Response
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -19,6 +19,8 @@ from services import llm as llm_svc
 from services import personas as P
 from services import jobs as jobs_svc
 from services import voice as voice_svc
+from services import auth as auth_svc
+from services import personalization as personal_svc
 from services import catalog as catalog_svc
 
 # Stripe via emergentintegrations
@@ -87,18 +89,41 @@ class ChatResponse(BaseModel):
 
 
 class ProfileIn(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     target_role: str = ""
     seniority: str = "unknown"
+    years_experience: int = 0
     location: str = ""
     remote: str = "any"
     salary_min: int = 0
     salary_max: int = 0
     skills: List[str] = []
+    languages: List[str] = []
+    qualifications: List[str] = []
+    education: str = ""
+    experience_summary: str = ""
     industries: List[str] = []
+    industries_avoid: List[str] = []
     must_haves: List[str] = []
     nice_to_haves: List[str] = []
+    strengths: List[str] = []
+    weaknesses: List[str] = []
+    availability: str = ""
+    cv_text: str = ""
+    cv_filename: str = ""
+    notes: str = ""
     summary: str = ""
+
+
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
 
 class JobMatchRequest(BaseModel):
@@ -186,11 +211,26 @@ async def chat(req: ChatRequest):
 
     history: List[Dict[str, str]] = list(sess.get("history") or [])
 
+    # Personalisation: pull profile + active package tier
+    profile = None
+    if req.user_id:
+        profile = await db.profiles.find_one({"user_id": req.user_id}, {"_id": 0})
+    tier = await personal_svc.active_tier(db, req.user_id or "", avatar)
+
+    base_system = personal_svc.build_personal_system(
+        persona["system"], profile, avatar, tier, lang_directive
+    )
+
     # Empty message = generate intro
     if not req.message.strip() and not history:
+        intro_system = base_system + (
+            "\nGreet the user by name (if provided in the profile) with one warm sentence and "
+            "ask one focused opening question that builds on their target_role and skills. "
+            "If the profile is empty, ask a single high-leverage question to learn the most."
+        )
         reply = await llm_svc.claude_chat(
             session_id=session_id,
-            system_prompt=persona["system"] + lang_directive + "\nGreet the user with a single warm sentence and ask one focused opening question.",
+            system_prompt=intro_system,
             history=[],
             latest_user_message="Begin the conversation now.",
         )
@@ -199,7 +239,7 @@ async def chat(req: ChatRequest):
         history.append({"role": "user", "content": req.message.strip()})
         reply = await llm_svc.claude_chat(
             session_id=session_id,
-            system_prompt=persona["system"] + lang_directive,
+            system_prompt=base_system,
             history=history,
             latest_user_message=req.message.strip(),
         )
@@ -258,7 +298,10 @@ async def extract_profile_from_session(payload: Dict[str, Any]):
 @api_router.get("/profile/{user_id}")
 async def get_profile(user_id: str):
     p = await db.profiles.find_one({"user_id": user_id}, {"_id": 0})
-    return p or {"user_id": user_id, "target_role": "", "seniority": "unknown", "skills": []}
+    if not p:
+        return {"user_id": user_id, "target_role": "", "seniority": "unknown", "skills": []}
+    p.pop("updated_at", None)
+    return p
 
 
 @api_router.put("/profile/{user_id}")
@@ -266,9 +309,106 @@ async def upsert_profile(user_id: str, body: ProfileIn):
     data = body.dict()
     data["user_id"] = user_id
     data["updated_at"] = now_utc()
+    # Mark profile as completed if target_role is set
+    data["completed"] = bool(data.get("target_role", "").strip())
     await db.profiles.update_one({"user_id": user_id}, {"$set": data}, upsert=True)
+    # Also sync the user record's display name when first/last bits become known via cv_text — kept minimal here
     data.pop("updated_at", None)
     return data
+
+
+# ---------------- Auth: signup / login / me ----------------
+def _norm_email(e: str) -> str:
+    return (e or "").strip().lower()
+
+
+@api_router.post("/auth/signup")
+async def auth_signup(body: SignupRequest):
+    name = (body.name or "").strip()
+    email = _norm_email(body.email)
+    pwd = (body.password or "")
+    if not name or not email or not pwd:
+        raise HTTPException(status_code=400, detail="name, email and password are required")
+    if len(pwd) < 6:
+        raise HTTPException(status_code=400, detail="password must be at least 6 characters")
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=400, detail="invalid email")
+    existing = await db.users.find_one({"email": email}, {"_id": 0, "user_id": 1})
+    if existing:
+        raise HTTPException(status_code=409, detail="email already registered")
+    user_id = f"u_{uuid.uuid4().hex[:14]}"
+    user_doc = {
+        "user_id": user_id,
+        "email": email,
+        "name": name,
+        "password_hash": auth_svc.hash_password(pwd),
+        "created_at": now_utc(),
+    }
+    await db.users.insert_one(user_doc)
+    # Seed an empty profile so personalisation has a row to upsert into
+    await db.profiles.update_one(
+        {"user_id": user_id},
+        {"$set": {"user_id": user_id, "name": name, "completed": False, "updated_at": now_utc()}},
+        upsert=True,
+    )
+    token = auth_svc.new_token()
+    await db.sessions.insert_one(
+        {"token": token, "user_id": user_id, "created_at": now_utc()}
+    )
+    return {
+        "ok": True,
+        "token": token,
+        "user": {"user_id": user_id, "email": email, "name": name},
+        "profile_completed": False,
+    }
+
+
+@api_router.post("/auth/login")
+async def auth_login(body: LoginRequest):
+    email = _norm_email(body.email)
+    pwd = body.password or ""
+    if not email or not pwd:
+        raise HTTPException(status_code=400, detail="email and password are required")
+    user = await db.users.find_one({"email": email})
+    if not user or not auth_svc.verify_password(pwd, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="invalid email or password")
+    token = auth_svc.new_token()
+    await db.sessions.insert_one(
+        {"token": token, "user_id": user["user_id"], "created_at": now_utc()}
+    )
+    profile = await db.profiles.find_one({"user_id": user["user_id"]}, {"_id": 0, "completed": 1})
+    return {
+        "ok": True,
+        "token": token,
+        "user": {"user_id": user["user_id"], "email": user["email"], "name": user.get("name", "")},
+        "profile_completed": bool(profile and profile.get("completed")),
+    }
+
+
+@api_router.get("/auth/me")
+async def auth_me(authorization: Optional[str] = Header(default=None)):
+    user = await auth_svc.user_from_token(db, authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    profile = await db.profiles.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    user.pop("password_hash", None)
+    return {"user": user, "profile": profile or {}, "profile_completed": bool(profile and profile.get("completed"))}
+
+
+@api_router.post("/auth/logout")
+async def auth_logout(authorization: Optional[str] = Header(default=None)):
+    if authorization:
+        token = authorization[7:].strip() if authorization.startswith("Bearer ") else authorization.strip()
+        if token:
+            await db.sessions.delete_many({"token": token})
+    return {"ok": True}
+
+
+# ---------------- Active package tier (debug / UI) ----------------
+@api_router.get("/account/tier")
+async def get_account_tier(user_id: str, avatar: str = "sofia"):
+    tier = await personal_svc.active_tier(db, user_id, avatar)
+    return {"tier": tier, "limits": personal_svc.tier_limits(tier)}
 
 
 # ---------------- Jobs (Maya) ----------------
@@ -285,12 +425,23 @@ async def interview_start(req: InterviewStartRequest):
     interview_id = str(uuid.uuid4())
     lang = (req.lang or "English").strip() or "English"
     lang_dir = f"\nReturn the question text in {lang}. Categories/difficulty stay in English keys."
+    # Pull profile + tier so questions are personalised and respect package depth
+    profile = await db.profiles.find_one({"user_id": req.user_id}, {"_id": 0}) if req.user_id else None
+    tier = await personal_svc.active_tier(db, req.user_id or "", "sofia")
+    tier_q_cap = personal_svc.tier_limits(tier)["interview_questions"]
+    total_questions = min(req.total_questions, tier_q_cap)
+    profile_ctx = personal_svc.profile_block(profile)
     qjson = await llm_svc.openai_json(
         session_id=f"itv_{interview_id}",
-        system_prompt="You generate adaptive interview questions." + lang_dir,
+        system_prompt=(
+            "You generate adaptive, role-specific interview questions tailored to the candidate's "
+            "profile. Reference their target_role, skills, and experience. Avoid generic openers."
+            + profile_ctx + lang_dir
+        ),
         user_prompt=P.INTERVIEW_QUESTION_PROMPT.format(
-            role=req.role, seniority=req.seniority, style=req.style, q_num=1, total=req.total_questions
-        ) + "\nThere is no previous answer yet. Open with a warm motivational question.",
+            role=req.role, seniority=req.seniority, style=req.style, q_num=1, total=total_questions
+        ) + "\nThere is no previous answer yet. Open with a focused question that lands on a "
+            "specific dimension of the candidate's target_role and seniority — NOT a generic 'tell me about yourself'.",
     )
     if "error" in qjson:
         qjson = {"question": "Tell me about yourself and what brought you to this role.", "category": "motivation", "difficulty": "easy"}
@@ -301,7 +452,8 @@ async def interview_start(req: InterviewStartRequest):
         "seniority": req.seniority,
         "style": req.style,
         "lang": lang,
-        "total": req.total_questions,
+        "tier": tier,
+        "total": total_questions,
         "current": 1,
         "questions": [qjson],
         "answers": [],
@@ -310,7 +462,7 @@ async def interview_start(req: InterviewStartRequest):
         "status": "in_progress",
     }
     await db.interviews.insert_one(doc.copy())
-    return {"interview_id": interview_id, "question": qjson, "current": 1, "total": req.total_questions}
+    return {"interview_id": interview_id, "question": qjson, "current": 1, "total": total_questions, "tier": tier}
 
 
 @api_router.post("/interview/answer")

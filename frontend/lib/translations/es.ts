@@ -131,6 +131,9 @@ const es: Translations = {
     speakerOn: "Respuestas de voz activadas",
     speakerOff: "Respuestas de voz desactivadas",
     voiceUnsupported: "Las respuestas de voz no son compatibles con este navegador",
+    greet: "¡Hola! 👋",
+    greetWithName: "¡Hola, {name}! 👋",
+    greetSub: "¿En qué puedo ayudarte hoy?",
   },
   checkout: {
     title: "Pago", oneTime: "Pago único",

@@ -190,6 +190,12 @@ const ro: Translations = {
     privateNote: "{role}",
     fallback: "Bună, sunt {name}. Cu ce te pot ajuta astăzi?",
     lostConnection: "Am pierdut conexiunea. Încerc din nou?",
+    speakerOn: "Răspunsuri vocale activate",
+    speakerOff: "Răspunsuri vocale dezactivate",
+    voiceUnsupported: "Răspunsurile vocale nu sunt acceptate în acest browser",
+    greet: "Bună! 👋",
+    greetWithName: "Bună, {name}! 👋",
+    greetSub: "Cu ce te pot ajuta astăzi?",
   },
   checkout: {
     title: "Plată",

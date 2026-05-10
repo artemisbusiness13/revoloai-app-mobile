@@ -193,6 +193,9 @@ const en: Translations = {
     speakerOn: "Voice replies on",
     speakerOff: "Voice replies off",
     voiceUnsupported: "Voice replies not supported on this browser",
+    greet: "Hello! 👋",
+    greetWithName: "Hello, {name}! 👋",
+    greetSub: "How can I help you today?",
   },
   checkout: {
     title: "Checkout",

@@ -131,6 +131,9 @@ const pa: Translations = {
     speakerOn: "ਆਵਾਜ਼ ਜਵਾਬ ਚਾਲੂ",
     speakerOff: "ਆਵਾਜ਼ ਜਵਾਬ ਬੰਦ",
     voiceUnsupported: "ਇਸ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਆਵਾਜ਼ ਜਵਾਬ ਸਮਰਥਿਤ ਨਹੀਂ",
+    greet: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ! 👋",
+    greetWithName: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, {name}! 👋",
+    greetSub: "ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦੀ ਹਾਂ?",
   },
   checkout: {
     title: "ਚੈੱਕਆਊਟ", oneTime: "ਇੱਕ ਵਾਰ",

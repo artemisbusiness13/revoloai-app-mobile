@@ -131,6 +131,9 @@ const ur: Translations = {
     speakerOn: "آواز جوابات آن",
     speakerOff: "آواز جوابات آف",
     voiceUnsupported: "اس براؤزر میں آواز جوابات سپورٹ نہیں",
+    greet: "سلام! 👋",
+    greetWithName: "سلام، {name}! 👋",
+    greetSub: "میں آپ کی آج کیسے مدد کر سکتی ہوں؟",
   },
   checkout: {
     title: "چیک آؤٹ", oneTime: "ایک بار",

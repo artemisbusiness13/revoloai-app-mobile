@@ -26,6 +26,7 @@ import {
   getOrCreateUserId,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 import {
   speak,
   stopSpeaking,
@@ -42,6 +43,7 @@ export default function ChatScreen() {
   const key = ((params.avatar as AvatarKey) || "sofia") as AvatarKey;
   const meta = AVATAR_META[key];
   const { t, langName, lang } = useI18n();
+  const { user } = useAuth();
   const isRTL = lang === "ur";
   const aName = t(`avatars.${key}.name`);
   const aRole = t(`avatars.${key}.role`);
@@ -82,33 +84,18 @@ export default function ChatScreen() {
     stopSpeaking();
   }, [lang]);
 
-  // intro on mount
+  // Simple local greeting — NO backend call.
+  // "Hello! 👋\nHow can I help you today?" (or with name if user is signed-in)
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const uid = await getOrCreateUserId();
-      try {
-        setSending(true);
-        const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
-          method: "POST",
-          body: JSON.stringify({ avatar: key, message: "", user_id: uid, lang: langName }),
-        });
-        if (!alive) return;
-        setSessionId(r.session_id);
-        setMessages([{ id: "ai0", role: "ai", content: r.reply }]);
-        setSuggestions(r.suggestions || []);
-      } catch (e) {
-        setMessages([
-          { id: "ai0", role: "ai", content: t("chat.fallback", { name: aName }) },
-        ]);
-      } finally {
-        if (alive) setSending(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [key, meta.name]);
+    const first = (user?.name || "").trim().split(/\s+/)[0] || "";
+    const line1 = first
+      ? t("chat.greetWithName", { name: first })
+      : t("chat.greet");
+    const line2 = t("chat.greetSub");
+    setMessages([{ id: "ai0", role: "ai", content: `${line1}\n${line2}` }]);
+    setSuggestions([]);
+    // sessionId stays undefined until the first user message — backend will create one then.
+  }, [key, lang, user?.name, t]);
 
   useEffect(() => {
     if (sending) {

@@ -132,6 +132,9 @@ const pl: Translations = {
     speakerOn: "Odpowiedzi głosowe włączone",
     speakerOff: "Odpowiedzi głosowe wyłączone",
     voiceUnsupported: "Odpowiedzi głosowe nie są obsługiwane w tej przeglądarce",
+    greet: "Cześć! 👋",
+    greetWithName: "Cześć, {name}! 👋",
+    greetSub: "W czym mogę Ci dzisiaj pomóc?",
   },
   checkout: {
     title: "Płatność", oneTime: "Jednorazowo",

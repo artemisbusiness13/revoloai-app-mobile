@@ -792,6 +792,63 @@ async def integrations_status():
     }
 
 
+@api_router.get("/health/integrations")
+async def health_integrations():
+    """Safe integration health endpoint — returns ONLY booleans and short
+    non-secret labels (e.g. 'live'/'test'/'missing'). Never exposes any key
+    value. Use this to verify which integrations are wired in production."""
+    anth_key = (os.environ.get("ANTHROPIC_API_KEY") or "").strip()
+    em_key = (os.environ.get("EMERGENT_LLM_KEY") or "").strip()
+    adz_id = (os.environ.get("ADZUNA_APP_ID") or "").strip()
+    adz_key = (os.environ.get("ADZUNA_APP_KEY") or "").strip()
+    # Stripe key may be set under either name in the wild; honour both
+    stripe_key = (
+        os.environ.get("STRIPE_API_KEY")
+        or os.environ.get("STRIPE_SECRET_KEY")
+        or ""
+    ).strip()
+    stripe_webhook = (os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+
+    if stripe_key.startswith("sk_live_"):
+        stripe_mode = "live"
+    elif stripe_key.startswith("sk_test_"):
+        stripe_mode = "test"
+    elif stripe_key:
+        stripe_mode = "unknown"
+    else:
+        stripe_mode = "missing"
+
+    backend_env = (os.environ.get("BACKEND_ENV")
+                   or os.environ.get("ENVIRONMENT")
+                   or ("production" if os.environ.get("EMERGENT_DEPLOYMENT") else "development"))
+
+    return {
+        # Anthropic
+        "anthropic_key_present": bool(anth_key),
+        "anthropic_direct_enabled": bool(anth_key),  # direct path activates iff key set
+        "emergent_llm_present": bool(em_key),
+        "llm_provider_active": (
+            "anthropic_direct" if anth_key else ("emergent_fallback" if em_key else "none")
+        ),
+        # Adzuna
+        "adzuna_keys_present": bool(adz_id and adz_key),
+        "adzuna_live_enabled": jobs_svc.adzuna_enabled(),
+        "adzuna_country": (os.environ.get("ADZUNA_COUNTRY") or "gb"),
+        # Stripe
+        "stripe_secret_key_present": bool(stripe_key),
+        "stripe_mode": stripe_mode,
+        "stripe_checkout_enabled": bool(stripe_key),
+        "stripe_webhook_secret_present": bool(stripe_webhook),
+        "stripe_webhook_enabled": bool(stripe_webhook),
+        # Voice
+        "voice_enabled": voice_svc.is_enabled(),
+        # Environment / backend identity
+        "backend_env": backend_env,
+        "backend_host": (os.environ.get("HOSTNAME") or "")[:32],
+        "production_backend_url_used": (os.environ.get("EXPO_PUBLIC_BACKEND_URL") or ""),
+    }
+
+
 # ---------------- Wire up app ----------------
 app.include_router(api_router)
 

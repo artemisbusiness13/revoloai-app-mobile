@@ -331,9 +331,9 @@ test_plan:
 backend_new:
   - task: "Login-required Stripe checkout + enriched metadata + email + return path"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
     needs_retesting: false
     status_history:
@@ -398,6 +398,29 @@ backend_new:
                 Remove the duplicate webhook handler at line 743 (or rename its path) so that the richer handler at line 860 (`stripe_webhook` + `_handle_checkout_session_paid`) is the one invoked. The richer handler also needs STRIPE_WEBHOOK_SECRET to be set in /app/backend/.env (currently empty); without it the handler returns 500 by design. If the intent is to accept unsigned webhooks in the sandbox, either (i) make signature verification conditional on STRIPE_WEBHOOK_SECRET being present, or (ii) merge the two handlers into one that writes the enriched fields unconditionally.
 
             VERDICT: 11/12 PASS. The login-required guard, email_required, response shape, DB enrichment (user_email/user_name/avatar_id/service_id/return_path), explicit-email override, and 404-on-unknown-item are all working correctly. The single FAIL is on webhook enrichment fields (paid_via_webhook + stripe_event_id) caused by a duplicate-route registration that shadows the richer handler.
+        - working: true
+          agent: "testing"
+          comment: |
+            RE-RUN of Scenario 7 ONLY (webhook enrichment) after main agent removed the old minimal handler at server.py line 743-757 and made signature verification in the surviving handler (now at line ~843) conditional on STRIPE_WEBHOOK_SECRET being present. Executed via /app/scenario7_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **ALL 6 STEPS PASS.**
+
+            ✅ Step 1 — Signup fresh user via POST /api/auth/signup (Aanya Sharma + webhook_t_<ts>_<rand>@example.com + ValidPass123!) → 200 with user_id=u_9f3fda5a727b48 (starts with u_), email lowercased.
+            ✅ Step 2 — POST /api/payments/checkout with that user_id + user_email + item_id="jobs-3" + success_url + cancel_url + avatar_id="maya" + return_path="/chat?avatar=maya" → 200 with purchase_id=31be86d0-…, session_id=cs_test_a1AqsKStSRv8…, amount=399, currency=gbp. Emergent Stripe proxy returned response_code=200 (visible in backend logs).
+            ✅ Step 3 — Pre-webhook GET /api/purchases?user_id=u_… returned the row with status="pending" and paid_via_webhook=None (as expected, not yet enriched).
+            ✅ Step 4 — POST /api/payments/webhook with synthetic event {id:"evt_test_ebb0f12116f242f6", type:"checkout.session.completed", data.object.{id:session_id, payment_status:"paid", amount_total:399, currency:"gbp", metadata:{purchase_id, user_id, item_id:"jobs-3", avatar:"maya"}}} → HTTP 200 body {received:true, event_id:"evt_test_…", type:"checkout.session.completed"}. NO idempotent flag (correct — first call). Backend log confirmed: "Stripe webhook accepted UNVERIFIED (no STRIPE_WEBHOOK_SECRET set)" → "Webhook: purchase 31be86d0-… marked PAID (user=u_…, item=jobs-3, avatar=maya, event=evt_test_ebb0f12116f242f6)".
+            ✅ Step 5 — Post-webhook GET /api/purchases?user_id=u_… row now contains the FULL enriched set:
+                  status="paid" ✓
+                  paid_at="2026-05-10T23:19:07.155000" (ISO datetime) ✓
+                  paid_via_webhook=True ✓
+                  stripe_event_id="evt_test_ebb0f12116f242f6" ✓
+                Row keys: ['amount','avatar','avatar_id','created_at','currency','id','item_id','item_title','kind','paid_at','paid_via_webhook','return_path','service_id','status','stripe_event_id','stripe_session_id','stripe_url','user_email','user_id','user_name'] — all spec-required audit fields present.
+            ✅ Step 6 — Idempotency: replayed the EXACT same webhook payload → HTTP 200 body {received:true, idempotent:true, event_id:"evt_test_…"}. The `idempotent:true` flag is now correctly returned (via db.stripe_events processed-status check in stripe_webhook). The DB row state is byte-identical to step 5: paid_at unchanged, stripe_event_id unchanged, paid_via_webhook unchanged. _handle_checkout_session_paid's internal guard (`if purchase.get("status") == "paid": return`) also held.
+
+            The duplicate handler removal + conditional signature verification fix is COMPLETE and VERIFIED. The single richer handler at server.py line ~843 (`stripe_webhook` → `_handle_checkout_session_paid`) is the only one dispatched, and it correctly:
+              • Parses unsigned JSON when STRIPE_WEBHOOK_SECRET is empty (with a loud WARNING log).
+              • Writes the enriched audit fields (paid_via_webhook=True, stripe_event_id) to the purchases row.
+              • Uses db.stripe_events as the idempotency ledger so the second call short-circuits with idempotent:true and never re-touches the row.
+
+            Login-required Stripe checkout task is now FULLY GREEN (12/12 sub-assertions across the original suite + this re-run).
 
 frontend_new:
   - task: "Full app translation coverage (EN/RO/PL/ES/PA/UR) + Urdu text-only RTL + mic flow verification"
@@ -575,3 +598,15 @@ agent_communication:
         3) After the fix, re-run Scenario 7 to confirm `paid_via_webhook=true` + `stripe_event_id` are written to the purchases row.
 
         VERDICT: Login-required guard + email_required + enriched purchases row + 404 on unknown item_id are all fully working. The webhook-side enrichment is broken due to a duplicate-route registration that shadows the richer handler.
+    - agent: "testing"
+      message: |
+        Re-ran ONLY Scenario 7 (webhook enrichment) after the main agent's fix (removed minimal handler at server.py line 743-757; made signature verification conditional on STRIPE_WEBHOOK_SECRET in the surviving handler at line ~843). Test script: /app/scenario7_test.py. **ALL 6 STEPS PASS.**
+
+        1) Signup u_9f3fda5a727b48 (webhook_t_<ts>@example.com / ValidPass123!) → 200.
+        2) /payments/checkout (jobs-3, avatar=maya, return_path=/chat?avatar=maya) → 200; emergent Stripe proxy 200; purchase_id + cs_test_… session_id returned.
+        3) Pre-webhook row: status=pending, paid_via_webhook=None.
+        4) /payments/webhook with synthetic checkout.session.completed (event_id=evt_test_ebb0f12116f242f6) → 200 {received:true, event_id, type}. Backend log: "Stripe webhook accepted UNVERIFIED (no STRIPE_WEBHOOK_SECRET set)" then "Webhook: purchase … marked PAID (event=evt_test_…)".
+        5) Post-webhook row contains FULL enriched audit set: status="paid", paid_at=ISO-datetime, paid_via_webhook=True, stripe_event_id="evt_test_ebb0f12116f242f6".
+        6) Replay same payload → 200 {received:true, idempotent:true, event_id} and DB row byte-identical (paid_at unchanged). db.stripe_events processed-status ledger short-circuits correctly.
+
+        Login-required Stripe checkout task is now fully green (working:true, stuck_count reset to 0, needs_retesting:false). No further action required on this task.

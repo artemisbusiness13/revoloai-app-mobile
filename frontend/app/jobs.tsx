@@ -6,6 +6,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 
 type Job = { id: string; title: string; company: string; location: string; remote: string; seniority: string; salary_min: number; salary_max: number; skills: string[]; match_score: number };
 
@@ -14,6 +15,7 @@ export default function JobsScreen() {
   const key = ((params.avatar as AvatarKey) || "maya") as AvatarKey;
   const meta = AVATAR_META[key];
   const { t } = useI18n();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<any>(null);
@@ -22,7 +24,9 @@ export default function JobsScreen() {
   const load = async () => {
     setLoading(true);
     try {
-      const uid = await getOrCreateUserId();
+      // Always prefer the authenticated user id so the search uses the saved
+      // profile (target_role, location, remote, salary, skills, ...).
+      const uid = user?.user_id || (await getOrCreateUserId());
       const r = await api<{ profile: any; matches: Job[] }>("/jobs/match", {
         method: "POST",
         body: JSON.stringify({ user_id: uid, limit: 10 }),
@@ -34,12 +38,12 @@ export default function JobsScreen() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.user_id]);
 
   const save = async (j: Job) => {
     setSavingId(j.id);
     try {
-      const uid = await getOrCreateUserId();
+      const uid = user?.user_id || (await getOrCreateUserId());
       await api("/saved-jobs", {
         method: "POST",
         body: JSON.stringify({ user_id: uid, title: j.title, company: j.company, location: j.location }),

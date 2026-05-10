@@ -134,6 +134,13 @@ const ur: Translations = {
     greet: "سلام! 👋",
     greetWithName: "سلام، {name}! 👋",
     greetSub: "میں آپ کی آج کیسے مدد کر سکتی ہوں؟",
+    profileSearchSummary: "میرے پاس آپ کا پروفائل محفوظ ہے۔ میں اس بنیاد پر تلاش کروں گی: {summary}.",
+    profileStartSearchQ: "کیا آپ چاہتے ہیں کہ میں ابھی تلاش شروع کروں؟",
+    profilePrepSummary: "میرے پاس آپ کا پروفائل محفوظ ہے۔ میں انٹرویو کی تیاری اس کے مطابق ترتیب دوں گی: {summary}.",
+    profileStartPrepQ: "کیا آپ ابھی موک انٹرویو شروع کرنا چاہتے ہیں؟",
+    profileCoachSummary: "میرے پاس آپ کا پروفائل محفوظ ہے۔ میں اس بنیاد پر رہنمائی کروں گی: {summary}.",
+    profileStartCoachQ: "آپ پہلے کس چیز پر کام کرنا چاہیں گے؟",
+    profileSavedNoFields: "میرے پاس آپ کا پروفائل محفوظ ہے۔ آپ کس چیز پر کام کرنا چاہتے ہیں؟",
   },
   checkout: {
     title: "چیک آؤٹ", oneTime: "ایک بار",

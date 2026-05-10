@@ -441,6 +441,27 @@ async def auth_logout(authorization: Optional[str] = Header(default=None)):
     return {"ok": True}
 
 
+@api_router.get("/profile/me")
+async def get_profile_me(authorization: Optional[str] = Header(default=None)):
+    """Return the saved profile for the currently logged-in user.
+    Authentication via Bearer token. Returns the FULL profile so the avatar
+    chat / paid job search can render an accurate context summary.
+    """
+    user = await auth_svc.user_from_token(db, authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    p = await db.profiles.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if not p:
+        p = {"user_id": user["user_id"], "completed": False}
+    p.pop("updated_at", None)
+    return {
+        "ok": True,
+        "user": {"user_id": user["user_id"], "email": user.get("email", ""), "name": user.get("name", "")},
+        "profile": p,
+        "profile_completed": bool(p.get("completed")),
+    }
+
+
 # ---------------- Active package tier (debug / UI) ----------------
 @api_router.get("/account/tier")
 async def get_account_tier(user_id: str, avatar: str = "sofia"):

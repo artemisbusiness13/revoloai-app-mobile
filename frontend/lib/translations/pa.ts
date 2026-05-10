@@ -134,6 +134,13 @@ const pa: Translations = {
     greet: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ! 👋",
     greetWithName: "ਸਤ ਸ੍ਰੀ ਅਕਾਲ, {name}! 👋",
     greetSub: "ਅੱਜ ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦੀ ਹਾਂ?",
+    profileSearchSummary: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਮੈਂ ਇਸ ਅਨੁਸਾਰ ਖੋਜ ਕਰਾਂਗੀ: {summary}.",
+    profileStartSearchQ: "ਕੀ ਤੁਸੀਂ ਚਾਹੁੰਦੇ ਹੋ ਕਿ ਮੈਂ ਹੁਣ ਖੋਜ ਸ਼ੁਰੂ ਕਰਾਂ?",
+    profilePrepSummary: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਮੈਂ ਇੰਟਰਵਿਊ ਤਿਆਰੀ ਨੂੰ ਇਸ ਅਨੁਸਾਰ ਢਾਲਾਂਗੀ: {summary}.",
+    profileStartPrepQ: "ਕੀ ਤੁਸੀਂ ਹੁਣ ਮੌਕ ਇੰਟਰਵਿਊ ਸ਼ੁਰੂ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    profileCoachSummary: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਮੈਂ ਇਸ ਅਨੁਸਾਰ ਮਾਰਗਦਰਸ਼ਨ ਕਰਾਂਗੀ: {summary}.",
+    profileStartCoachQ: "ਤੁਸੀਂ ਪਹਿਲਾਂ ਕਿਸ ਉੱਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
+    profileSavedNoFields: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਤੁਸੀਂ ਕਿਸ ਉੱਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
   },
   checkout: {
     title: "ਚੈੱਕਆਊਟ", oneTime: "ਇੱਕ ਵਾਰ",

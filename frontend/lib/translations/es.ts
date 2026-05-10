@@ -134,6 +134,13 @@ const es: Translations = {
     greet: "¡Hola! 👋",
     greetWithName: "¡Hola, {name}! 👋",
     greetSub: "¿En qué puedo ayudarte hoy?",
+    profileSearchSummary: "Tengo tu perfil guardado. Buscaré según: {summary}.",
+    profileStartSearchQ: "¿Quieres que empiece la búsqueda ahora?",
+    profilePrepSummary: "Tengo tu perfil guardado. Adaptaré la preparación de tu entrevista a: {summary}.",
+    profileStartPrepQ: "¿Quieres comenzar una entrevista simulada ahora?",
+    profileCoachSummary: "Tengo tu perfil guardado. Te asesoraré según: {summary}.",
+    profileStartCoachQ: "¿En qué te gustaría trabajar primero?",
+    profileSavedNoFields: "Tengo tu perfil guardado. ¿En qué quieres trabajar?",
   },
   checkout: {
     title: "Pago", oneTime: "Pago único",

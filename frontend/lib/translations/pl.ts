@@ -135,6 +135,13 @@ const pl: Translations = {
     greet: "Cześć! 👋",
     greetWithName: "Cześć, {name}! 👋",
     greetSub: "W czym mogę Ci dzisiaj pomóc?",
+    profileSearchSummary: "Mam zapisany Twój profil. Wyszukam na podstawie: {summary}.",
+    profileStartSearchQ: "Czy chcesz, żebym zaczęła wyszukiwanie?",
+    profilePrepSummary: "Mam zapisany Twój profil. Dopasuję przygotowanie do rozmowy do: {summary}.",
+    profileStartPrepQ: "Czy chcesz teraz rozpocząć rozmowę próbną?",
+    profileCoachSummary: "Mam zapisany Twój profil. Będę doradzać na podstawie: {summary}.",
+    profileStartCoachQ: "Nad czym chciałbyś popracować najpierw?",
+    profileSavedNoFields: "Mam zapisany Twój profil. Nad czym chcesz popracować?",
   },
   checkout: {
     title: "Płatność", oneTime: "Jednorazowo",

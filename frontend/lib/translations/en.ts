@@ -196,6 +196,13 @@ const en: Translations = {
     greet: "Hello! 👋",
     greetWithName: "Hello, {name}! 👋",
     greetSub: "How can I help you today?",
+    profileSearchSummary: "I have your profile saved. I'll search based on: {summary}.",
+    profileStartSearchQ: "Do you want me to start the search now?",
+    profilePrepSummary: "I have your profile saved. I'll tailor your interview prep to: {summary}.",
+    profileStartPrepQ: "Do you want to start a mock interview now?",
+    profileCoachSummary: "I have your profile saved. I'll coach based on: {summary}.",
+    profileStartCoachQ: "What would you like to work on first?",
+    profileSavedNoFields: "I have your profile saved. What would you like to work on?",
   },
   checkout: {
     title: "Checkout",

@@ -196,6 +196,13 @@ const ro: Translations = {
     greet: "Bună! 👋",
     greetWithName: "Bună, {name}! 👋",
     greetSub: "Cu ce te pot ajuta astăzi?",
+    profileSearchSummary: "Am profilul tău salvat. Voi căuta pe baza: {summary}.",
+    profileStartSearchQ: "Vrei să pornesc căutarea acum?",
+    profilePrepSummary: "Am profilul tău salvat. Voi adapta pregătirea de interviu pentru: {summary}.",
+    profileStartPrepQ: "Vrei să începem un interviu simulat acum?",
+    profileCoachSummary: "Am profilul tău salvat. Voi îndruma pe baza: {summary}.",
+    profileStartCoachQ: "La ce vrei să lucrăm mai întâi?",
+    profileSavedNoFields: "Am profilul tău salvat. La ce vrei să lucrăm?",
   },
   checkout: {
     title: "Plată",

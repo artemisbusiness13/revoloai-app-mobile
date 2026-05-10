@@ -323,10 +323,106 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Login-required Stripe checkout (block guests, enrich metadata, save purchase to logged-in user)"
+    - "Profile-aware chat context + GET /api/profile/me + jobs use logged-in profile"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend_new2:
+  - task: "Profile-aware chat context + GET /api/profile/me + jobs use logged-in profile"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py, /app/backend/services/personalization.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Changes:
+            1) Added new endpoint `GET /api/profile/me` that returns the logged-in user's saved profile + user info using Bearer token auth. Returns 401 when token missing/invalid. Returns 200 with `{ok, user, profile, profile_completed}` when authenticated.
+            2) Tightened `personal_directive()` in personalization.py for Maya/Sofia/Aria to:
+               - NEVER ask repeat questions for fields already in the USER PROFILE.
+               - NEVER print a long profile dump or markdown bullets.
+               - Ask for only ONE missing field at a time when essential.
+               - Never invent profile data.
+            3) `/jobs/match` is unchanged but the frontend now sends the authenticated user_id (previously it sent a guest id which had no profile row).
+        - working: false
+          agent: "testing"
+          comment: |
+            8-scenario suite executed via /app/profile_me_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **4/8 PASS, 4/8 FAIL.**
+
+            ❌ CRITICAL ROUTING BUG — Scenarios 1, 2, 3 all FAIL because GET /api/profile/me is **shadowed by GET /api/profile/{user_id}**.
+                • server.py line 335: `@api_router.get("/profile/{user_id}")` — registered first.
+                • server.py line 444: `@api_router.get("/profile/me")` — registered second.
+                FastAPI / Starlette dispatches to the FIRST matching route, so any call to /api/profile/me hits `get_profile(user_id="me")` and returns the no-profile default `{"user_id": "me", "target_role": "", "seniority": "unknown", "skills": []}` with HTTP 200 regardless of Authorization header. The new `get_profile_me` handler at line 444 is dead code.
+                Direct curl confirms:
+                  GET /api/profile/me → 200 {"user_id":"me","target_role":"","seniority":"unknown","skills":[]}
+                  GET /api/profile/me with Bearer <valid> → SAME response (auth ignored).
+                  GET /api/profile/me with Bearer not_a_token → SAME response (no 401 raised).
+                FIX: Move the `@api_router.get("/profile/me")` route registration ABOVE `@api_router.get("/profile/{user_id}")` in server.py. (FastAPI matches in declaration order — static paths must come first.)
+
+            ❌ Scenario 1 — GET /profile/me with fresh user signup (Authorization: Bearer <valid>) — FAIL
+                EXPECTED: 200 with {ok:true, user:{user_id:u_..., email, name}, profile:{...}, profile_completed:false}
+                ACTUAL  : 200 with {"user_id":"me","target_role":"","seniority":"unknown","skills":[]}
+                Reason: shadowed by /profile/{user_id} as above.
+
+            ❌ Scenario 2 — Missing / invalid token → 401 — FAIL
+                EXPECTED: 401 with detail="not authenticated" for both missing-header and bad-token cases.
+                ACTUAL  : Both return HTTP 200 with the no-profile default body.
+                Reason: shadowed route never invokes auth_svc.user_from_token, so no 401 is raised.
+
+            ❌ Scenario 3 — PUT profile, then GET /profile/me echoes saved fields + completed=true — FAIL
+                PUT /api/profile/u_cabb43139fe74c with the full body returned 200 and saved target_role="Senior Business Analyst", location="Bucharest", remote="hybrid", salary_min/max=4000/6000, skills=["SQL","Python","analytics"], seniority="senior", etc. (verified by GET /api/profile/<user_id> directly — that flow works).
+                GET /api/profile/me with Bearer <valid token> still returned the empty default {user_id:"me", ...}. profile_completed key is absent.
+                Reason: same shadow bug. The data IS saved on the correct user record; the /me endpoint just never gets reached.
+
+            ✅ Scenario 4 — empty chat message → no profile dump, mentions target_role, no repeats — PASS
+                Reply (301 chars): "Hey Priya! I can see you're targeting Senior Business Analyst roles in Bucharest with your strong SQL, Python, and analytics background. Are you ready for me to search for hybrid opportunities in fintech or retail that match your 4000–6000 GBP salary range, or would you like to adjust anything first?"
+                Heuristics: bullet_lines=0 (≤3 ✓), question_marks=1 (≤1 ✓), mentions "Senior Business Analyst" ✓, no forbidden questions about target_role/city/salary/remote/skills ✓.
+
+            ✅ Scenario 5 — 'start the search' acknowledges, no repeat questions — PASS
+                Reply (260 chars): "Perfect! I'll search for **Senior Business Analyst** roles in **Bucharest (hybrid)**, paying **£4,000–6,000/year**, matching your SQL, Python, and analytics background in fintech or retail. Tap **'Find jobs'** in the app now and I'll pull your top 3 matches!"
+                Heuristics: bullet_lines=0 (≤3 ✓), question_marks=0 ✓, acknowledges search ("search"/"pull"/"matches") ✓, no forbidden repeat questions ✓.
+                Note: Maya does still use **markdown bold** (e.g. **Senior Business Analyst**) — the new directive says "Do NOT use markdown bold, asterisks, or bullet-point dumps" — this is a minor stylistic drift but not flagged as a hard failure since it's bold formatting, not a profile dump or repeat question. Flagging here for main-agent awareness; the directive could be strengthened or examples added.
+
+            ❌ Scenario 6 — only location missing → must ask ONE missing field (location) — FAIL
+                Wiped location via PUT (location=""). Sent empty-message chat to Maya with a fresh session_id.
+                Reply (282 chars): "Hi Priya! I can see you're targeting Senior Business Analyst roles in fintech or retail, working hybrid with your strong SQL and Python background. Are you ready for me to start searching, or is there anything specific about the type of company or projects you'd like to prioritise?"
+                Heuristics: bullet_lines=0 ✓, question_marks=1 ✓, but the reply does NOT mention "location" / "city" / "where" — it asked a vague "type of company or projects" follow-up instead of the single missing field. Spec says the reply MUST contain "location" or "which city" or "where" exactly once.
+                NOTE per main-agent instructions: "If scenario 4 fails because Claude still asks about already-filled fields, report it but DO NOT modify the prompt." Same spirit here — Claude's behaviour is non-deterministic; the directive currently says "ask for only ONE missing field if essential" but does not force a location-specific phrasing. Reporting as-is. Main agent may want to consider either (i) hard-coding a deterministic "Which city?" follow-up when location is blank, or (ii) adding an example to the personal_directive("maya") prompt.
+
+            ✅ Scenario 7 — /jobs/match with authenticated user_id — PASS
+                POST /api/jobs/match {user_id: u_cabb43139fe74c, limit: 5} → 200.
+                Returned `profile.target_role`="Senior Business Analyst", `profile.location`="Bucharest", `profile.salary_min/max`=4000/6000, `profile.skills`=["SQL","Python","analytics"]. matches=[5 curated jobs, first "Senior Product Designer"]. live=false (curated pool fallback because Adzuna is not configured). New ProfileIn schema doesn't break the endpoint.
+
+            ✅ Scenario 8 — regression /payments/checkout guard — PASS
+                (a) POST /payments/checkout {user_id:"g_guestxyz", item_id:"jobs-3", ...} → 401 detail="login_required". ✓
+                (b) POST /payments/checkout {user_id:USER_ID, user_email:EMAIL, item_id:"jobs-3", success_url, cancel_url, avatar_id:"maya", return_path:"/chat?avatar=maya"} → 200 with all 5 required keys (purchase_id, session_id, url, amount=399, currency="gbp"). ✓
+
+            SUMMARY: 4 PASS, 4 FAIL. The most important defect is the route-ordering bug that makes /api/profile/me unreachable — it must be fixed before front-end can rely on the endpoint. Personalisation directive is mostly honoured (4, 5, 7 all pass) but the "ask only for the single missing field" instruction did not trigger a location-specific question in scenario 6. Scenarios 4 and 5 confirm Claude does NOT re-ask filled fields and does NOT dump the profile back to the user — directive is largely working.
+
+            ACTION REQUIRED:
+              1) **CRITICAL** — Move the `@api_router.get("/profile/me")` route registration to BEFORE `@api_router.get("/profile/{user_id}")` in /app/backend/server.py (so the static path is matched first). Re-run scenarios 1, 2, 3 — they will pass once the route is reachable.
+              2) Optional — Consider sharpening the Maya directive to explicitly bind the "single missing field" rule to the field name (e.g. for blank location: "Ask ONLY 'Which city are you targeting?' — do not ask anything else."). And/or add a no-markdown-bold reinforcement so replies don't use **bold**.
+              3) No backend code regressions found — auth/signup/login, PUT /profile/<id>, GET /profile/<id> directly, /chat personalisation, /jobs/match, and /payments/checkout all still work.
+
+            Required tests (against public ingress URL):
+            (1) Signup a fresh user via POST /api/auth/signup → keep token. Call GET /api/profile/me with Bearer token → expect 200 with profile.completed=false (the seed row).
+            (2) Missing/invalid token → GET /api/profile/me → expect 401 detail="not authenticated".
+            (3) PUT /api/profile/{user_id} with a full body (target_role="Senior Business Analyst", location="Bucharest", remote="hybrid", salary_min=4000, salary_max=6000, skills=["SQL","Python","analytics"], seniority="senior", experience_summary="...") → 200.
+                Then GET /api/profile/me → must return the same fields. profile_completed=true.
+            (4) POST /api/chat with that user_id, avatar="maya", empty message — assert the AI reply:
+                - Does NOT contain bullet markdown (`- ` lines)
+                - Does NOT re-ask for target_role / location / remote / salary (these were just filled). Heuristic: reply must NOT contain question words like "What is your target role" or "Which city" or "What's your salary".
+                - SHOULD include at least one of: the target_role string OR "search" / "căut" (RO) / similar — i.e. acknowledge readiness to help.
+            (5) POST /api/chat with avatar="maya" and message "start the search" — reply should NOT ask for missing data because the profile is complete. It should acknowledge it will search using saved fields.
+            (6) Wipe location field (PUT profile with location="") — then POST /api/chat empty message with avatar="maya" → reply SHOULD ask ONLY for location (single missing field), not the whole form. Heuristic: count question marks → expect ≤1 question, and the reply must mention 'location' or 'where'.
+            (7) POST /api/jobs/match with the authenticated user_id and limit=5 → reply.profile should reflect saved fields (target_role, location, salary range); reply.matches should be a non-empty list scored using those fields.
+            (8) Regression: existing `POST /api/payments/checkout` still works as in the previous task (HTTP 401 for guests, 200 for valid auth-id users with email).
+
+            Reference: this builds on the previous task. /profile/me is the new endpoint to verify.
 
 backend_new:
   - task: "Login-required Stripe checkout + enriched metadata + email + return path"
@@ -610,3 +706,33 @@ agent_communication:
         6) Replay same payload → 200 {received:true, idempotent:true, event_id} and DB row byte-identical (paid_at unchanged). db.stripe_events processed-status ledger short-circuits correctly.
 
         Login-required Stripe checkout task is now fully green (working:true, stuck_count reset to 0, needs_retesting:false). No further action required on this task.
+    - agent: "testing"
+      message: |
+        Profile-aware chat + GET /api/profile/me + jobs-use-logged-in-profile suite executed via /app/profile_me_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **4/8 PASS, 4/8 FAIL.**
+
+        ❌ CRITICAL ROUTING BUG — Scenarios 1, 2, 3 all FAIL because GET /api/profile/me is **shadowed by the earlier-declared dynamic route GET /api/profile/{user_id}**.
+          • server.py line 335: @api_router.get("/profile/{user_id}") — registered first → catches ALL /profile/* paths.
+          • server.py line 444: @api_router.get("/profile/me") — registered second → dead code.
+          Direct curl: GET /api/profile/me → 200 {"user_id":"me","target_role":"","seniority":"unknown","skills":[]} regardless of Authorization header. No 401 ever raised even with no token or a garbage token.
+          FIX: Move the @api_router.get("/profile/me") definition ABOVE @api_router.get("/profile/{user_id}") in /app/backend/server.py so FastAPI matches the static path first. Verified the new handler's code is correct — it just needs to be registered earlier.
+
+        ❌ Scenario 6 — only location missing → Maya didn't ask for "location" / "city" / "where". Reply asked a vague "type of company or projects" follow-up instead. Per main-agent instructions, NOT modifying the prompt; flagging only. Heuristic ≤3 bullets + ≤1 question-mark both held, but the must-mention-location check failed. Consider strengthening the directive with a deterministic phrasing example, or hard-coding a frontend follow-up when location is blank.
+
+        ✅ Scenarios 4, 5 — Personalisation directives ARE being honoured by Claude:
+          • Scenario 4 (empty msg, full profile): Maya greeted by name, named the target_role + skills + location + salary range, and asked one forward-looking question. No profile dump, no repeats. 1 question mark, 0 bullets.
+          • Scenario 5 ("start the search"): Maya acknowledged target_role + location + salary + skills and instructed the user to tap 'Find jobs'. Zero questions, zero bullets, zero repeats.
+          Minor stylistic note: Maya still uses **markdown bold** despite the directive saying "Do NOT use markdown bold". Not a hard fail, but main agent may want to reinforce.
+
+        ✅ Scenario 7 — /api/jobs/match with the authenticated u_… returns the saved profile (target_role / location / salary range) and 5 matches from the curated pool. live=false because Adzuna isn't configured — expected fallback. No code defect.
+
+        ✅ Scenario 8 — Regression on /api/payments/checkout still works: guest user_id → 401 login_required, authenticated user_id → 200 with all 5 required keys (purchase_id, session_id, url, amount=399, currency="gbp").
+
+        BLOCKING ACTION FOR MAIN AGENT:
+        1) Move the @api_router.get("/profile/me") declaration ABOVE @api_router.get("/profile/{user_id}") in server.py — this is a one-line move that will unblock Scenarios 1, 2, 3.
+        2) Re-run after the fix — Scenarios 1/2/3 should all pass; no code changes needed in personalization.py.
+
+        Non-blocking suggestions:
+        • Strengthen Maya directive for the "single-missing-field" case with explicit example wording.
+        • Optionally reinforce "no markdown bold/asterisks" — Maya keeps using ** for emphasis.
+
+        Test artefact: /app/profile_me_test.py

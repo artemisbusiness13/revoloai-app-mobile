@@ -84,18 +84,71 @@ export default function ChatScreen() {
     stopSpeaking();
   }, [lang]);
 
-  // Simple local greeting — NO backend call.
-  // "Hello! 👋\nHow can I help you today?" (or with name if user is signed-in)
+  // Simple local greeting — NO backend call by default.
+  // When the user is LOGGED IN AND has a completed onboarding profile, build
+  // a deterministic context summary from the saved profile fields so we
+  // NEVER hallucinate or repeat questions.
+  const [profile, setProfile] = useState<any>(null);
   useEffect(() => {
+    let alive = true;
     const first = (user?.name || "").trim().split(/\s+/)[0] || "";
-    const line1 = first
+    const fallbackLine1 = first
       ? t("chat.greetWithName", { name: first })
       : t("chat.greet");
-    const line2 = t("chat.greetSub");
-    setMessages([{ id: "ai0", role: "ai", content: `${line1}\n${line2}` }]);
+    const fallbackLine2 = t("chat.greetSub");
+    const fallback = `${fallbackLine1}\n${fallbackLine2}`;
+    // Default to the simple greeting immediately so the UI never feels stuck.
+    setMessages([{ id: "ai0", role: "ai", content: fallback }]);
     setSuggestions([]);
-    // sessionId stays undefined until the first user message — backend will create one then.
-  }, [key, lang, user?.name, t]);
+    setProfile(null);
+    if (!user?.user_id) return;
+    (async () => {
+      try {
+        const r = await api<any>(`/profile/${user.user_id}`);
+        if (!alive) return;
+        if (!r || !r.target_role) {
+          setProfile(r || null);
+          return; // keep the simple greeting
+        }
+        setProfile(r);
+        // Build deterministic search-criteria summary line. Only include
+        // fields that actually have values — NO invented data.
+        const fields: string[] = [];
+        if (r.target_role) fields.push(String(r.target_role));
+        if (r.location) fields.push(String(r.location));
+        // remote can be "remote", "hybrid", "onsite", "any"
+        const remote = String(r.remote || "").toLowerCase();
+        if (remote && remote !== "any" && remote !== "unknown") fields.push(remote);
+        const minS = Number(r.salary_min || 0);
+        const maxS = Number(r.salary_max || 0);
+        if (minS && maxS) fields.push(`£${minS.toLocaleString()}–£${maxS.toLocaleString()}`);
+        else if (minS) fields.push(`from £${minS.toLocaleString()}`);
+        else if (maxS) fields.push(`up to £${maxS.toLocaleString()}`);
+        const summary = fields.join(", ");
+        // Per-avatar wording
+        let line1 = first ? t("chat.greetWithName", { name: first }) : t("chat.greet");
+        let line2: string;
+        if (key === "maya") {
+          line2 = summary
+            ? t("chat.profileSearchSummary", { summary }) + "\n" + t("chat.profileStartSearchQ")
+            : t("chat.profileSavedNoFields");
+        } else if (key === "sofia") {
+          line2 = summary
+            ? t("chat.profilePrepSummary", { summary }) + "\n" + t("chat.profileStartPrepQ")
+            : t("chat.profileSavedNoFields");
+        } else {
+          // aria
+          line2 = summary
+            ? t("chat.profileCoachSummary", { summary }) + "\n" + t("chat.profileStartCoachQ")
+            : t("chat.profileSavedNoFields");
+        }
+        setMessages([{ id: "ai0", role: "ai", content: `${line1}\n${line2}` }]);
+      } catch {
+        /* keep fallback greeting */
+      }
+    })();
+    return () => { alive = false; };
+  }, [key, lang, user?.user_id, user?.name, t]);
 
   useEffect(() => {
     if (sending) {
@@ -122,7 +175,9 @@ export default function ChatScreen() {
     setSending(true);
     if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
     try {
-      const uid = await getOrCreateUserId();
+      // Prefer the authenticated user_id so the backend can find the saved
+      // profile (anonymous guest IDs have no profile row).
+      const uid = user?.user_id || (await getOrCreateUserId());
       const r = await api<{ session_id: string; reply: string; suggestions: string[] }>("/chat", {
         method: "POST",
         body: JSON.stringify({ avatar: key, message: txt, session_id: sessionId, user_id: uid, lang: langName }),
@@ -154,7 +209,7 @@ export default function ChatScreen() {
     if (matching) return;
     setMatching(true);
     try {
-      const uid = await getOrCreateUserId();
+      const uid = user?.user_id || (await getOrCreateUserId());
       if (sessionId) {
         await api("/profile/extract", {
           method: "POST",
@@ -172,7 +227,7 @@ export default function ChatScreen() {
     if (matching) return;
     setMatching(true);
     try {
-      const uid = await getOrCreateUserId();
+      const uid = user?.user_id || (await getOrCreateUserId());
       // Try to enrich from current chat first
       if (sessionId) {
         await api("/profile/extract", {
@@ -180,9 +235,9 @@ export default function ChatScreen() {
           body: JSON.stringify({ user_id: uid, session_id: sessionId }),
         }).catch(() => {});
       }
-      const profile = await api<any>(`/profile/${uid}`).catch(() => null);
-      const role = profile?.target_role || "Generalist";
-      const seniority = profile?.seniority && profile.seniority !== "unknown" ? profile.seniority : "mid";
+      const prof = await api<any>(`/profile/${uid}`).catch(() => null);
+      const role = prof?.target_role || "Generalist";
+      const seniority = prof?.seniority && prof.seniority !== "unknown" ? prof.seniority : "mid";
       router.push({
         pathname: "/interview",
         params: { role, seniority, total: "5" },

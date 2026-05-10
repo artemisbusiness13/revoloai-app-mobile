@@ -30,7 +30,6 @@ import {
 import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
 import { useAuth } from "../lib/auth";
-import { router } from "expo-router";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({

@@ -43,11 +43,41 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 stripe_checkout: Optional[StripeCheckout] = None
 
 
+def _resolve_stripe_key() -> str:
+    """Resolve the Stripe API key. Accepts either STRIPE_API_KEY (legacy)
+    or STRIPE_SECRET_KEY (Stripe's own naming). A LIVE key (sk_live_*) wins
+    over a test/sandbox key (sk_test_emergent) when both are set, so the
+    presence of the Emergent sandbox key never accidentally overrides a real
+    live key the operator has configured."""
+    a = (os.environ.get("STRIPE_API_KEY") or "").strip()
+    b = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    # Prefer a real Stripe key (live or proper test) over the Emergent sandbox.
+    candidates = [k for k in (a, b) if k]
+    real = next((k for k in candidates if k.startswith(("sk_live_", "sk_test_")) and "emergent" not in k), None)
+    if real:
+        return real
+    # Otherwise, return whichever is set (may be the Emergent sandbox).
+    return a or b
+
+
+def _stripe_mode_label(api_key: str) -> str:
+    if not api_key:
+        return "missing"
+    if api_key.startswith("sk_live_"):
+        return "live"
+    if "sk_test_emergent" in api_key:
+        return "emergent_sandbox"
+    if api_key.startswith("sk_test_"):
+        return "test"
+    return "unknown"
+
+
 def _get_stripe(request: Request) -> StripeCheckout:
-    """Return a fresh StripeCheckout instance — its __init__ ensures
-    stripe.api_base points to the Emergent proxy when using sk_test_emergent.
-    """
-    api_key = os.environ.get("STRIPE_API_KEY", "")
+    """Return a fresh StripeCheckout instance using whichever key the operator
+    has configured (STRIPE_API_KEY or STRIPE_SECRET_KEY). The library routes
+    through the Emergent proxy ONLY when the key literally contains
+    'sk_test_emergent'."""
+    api_key = _resolve_stripe_key()
     if not api_key:
         raise HTTPException(status_code=500, detail="Stripe not configured")
     host = request.headers.get("origin") or str(request.base_url).rstrip("/")
@@ -610,7 +640,7 @@ async def payments_status(session_id: str, request: Request):
     """Return payment status. Tries Stripe first; falls back to our local
     DB record (updated by webhook OR /payments/confirm)."""
     purchase = await db.purchases.find_one({"stripe_session_id": session_id}, {"_id": 0})
-    use_emergent_sandbox = "sk_test_emergent" in os.environ.get("STRIPE_API_KEY", "")
+    use_emergent_sandbox = "sk_test_emergent" in _resolve_stripe_key()
     if not use_emergent_sandbox:
         try:
             sc = _get_stripe(request)
@@ -938,22 +968,12 @@ async def health_integrations():
     em_key = (os.environ.get("EMERGENT_LLM_KEY") or "").strip()
     adz_id = (os.environ.get("ADZUNA_APP_ID") or "").strip()
     adz_key = (os.environ.get("ADZUNA_APP_KEY") or "").strip()
-    # Stripe key may be set under either name in the wild; honour both
-    stripe_key = (
-        os.environ.get("STRIPE_API_KEY")
-        or os.environ.get("STRIPE_SECRET_KEY")
-        or ""
-    ).strip()
+    # Stripe — check which key the CHECKOUT CODE actually uses (not just presence)
+    checkout_key = _resolve_stripe_key()
+    raw_api = (os.environ.get("STRIPE_API_KEY") or "").strip()
+    raw_secret = (os.environ.get("STRIPE_SECRET_KEY") or "").strip()
+    stripe_mode = _stripe_mode_label(checkout_key)
     stripe_webhook = (os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
-
-    if stripe_key.startswith("sk_live_"):
-        stripe_mode = "live"
-    elif stripe_key.startswith("sk_test_"):
-        stripe_mode = "test"
-    elif stripe_key:
-        stripe_mode = "unknown"
-    else:
-        stripe_mode = "missing"
 
     backend_env = (os.environ.get("BACKEND_ENV")
                    or os.environ.get("ENVIRONMENT")
@@ -972,9 +992,12 @@ async def health_integrations():
         "adzuna_live_enabled": jobs_svc.adzuna_enabled(),
         "adzuna_country": (os.environ.get("ADZUNA_COUNTRY") or "gb"),
         # Stripe
-        "stripe_secret_key_present": bool(stripe_key),
+        "stripe_secret_key_present": bool(checkout_key),
+        "stripe_api_key_var_present": bool(raw_api),
+        "stripe_secret_key_var_present": bool(raw_secret),
         "stripe_mode": stripe_mode,
-        "stripe_checkout_enabled": bool(stripe_key),
+        "stripe_checkout_enabled": bool(checkout_key),
+        "stripe_checkout_routes_through_emergent_sandbox": (stripe_mode == "emergent_sandbox"),
         "stripe_webhook_secret_present": bool(stripe_webhook),
         "stripe_webhook_enabled": bool(stripe_webhook),
         # Voice

@@ -778,6 +778,143 @@ async def voice_tts(payload: Dict[str, Any]):
     return Response(content=audio, media_type="audio/mpeg")
 
 
+# ---------------- Stripe webhook ----------------
+import stripe as _stripe_sdk  # official Stripe SDK for signature verification
+
+
+@api_router.post("/payments/webhook")
+async def stripe_webhook(request: Request):
+    """Stripe webhook endpoint. Verifies signature, then handles
+    checkout.session.completed and checkout.session.async_payment_succeeded
+    events to mark the matching purchase as paid. Idempotent — every event
+    is recorded in the `stripe_events` collection by event_id.
+    """
+    raw_body = await request.body()
+    sig_header = request.headers.get("Stripe-Signature") or request.headers.get("stripe-signature") or ""
+    webhook_secret = (os.environ.get("STRIPE_WEBHOOK_SECRET") or "").strip()
+
+    if not webhook_secret:
+        log.error("Stripe webhook called but STRIPE_WEBHOOK_SECRET is not set")
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
+
+    # 1) Verify signature — REJECTS forged events
+    try:
+        event = _stripe_sdk.Webhook.construct_event(
+            payload=raw_body,
+            sig_header=sig_header,
+            secret=webhook_secret,
+        )
+    except _stripe_sdk.error.SignatureVerificationError as e:
+        log.warning("Stripe webhook bad signature: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except ValueError as e:
+        log.warning("Stripe webhook bad payload: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid payload")
+
+    event_id = event.get("id") or ""
+    event_type = event.get("type") or ""
+    livemode = bool(event.get("livemode"))
+
+    # 2) Idempotency — we have already processed this event_id, ack and stop
+    if event_id:
+        existing = await db.stripe_events.find_one({"event_id": event_id}, {"_id": 0, "status": 1})
+        if existing and existing.get("status") == "processed":
+            return {"received": True, "idempotent": True, "event_id": event_id}
+        # Insert a "received" marker now so concurrent retries are deduped
+        try:
+            await db.stripe_events.insert_one({
+                "event_id": event_id,
+                "type": event_type,
+                "livemode": livemode,
+                "status": "received",
+                "received_at": now_utc(),
+            })
+        except Exception:
+            # Duplicate insert (unique index). Another worker is processing it.
+            return {"received": True, "idempotent": True, "event_id": event_id}
+
+    # 3) Dispatch to handler
+    try:
+        if event_type in ("checkout.session.completed", "checkout.session.async_payment_succeeded"):
+            await _handle_checkout_session_paid(event["data"]["object"], event_id)
+        else:
+            # Unhandled event types are still acknowledged so Stripe stops retrying
+            log.info("Stripe webhook: ignored event type %s (id=%s)", event_type, event_id)
+    except Exception as e:
+        log.exception("Stripe webhook handler error for %s (%s): %s", event_id, event_type, e)
+        # Mark as failed so Stripe retries it
+        if event_id:
+            await db.stripe_events.update_one(
+                {"event_id": event_id},
+                {"$set": {"status": "failed", "error": str(e)[:500], "failed_at": now_utc()}},
+            )
+        raise HTTPException(status_code=500, detail="Handler error — Stripe will retry")
+
+    if event_id:
+        await db.stripe_events.update_one(
+            {"event_id": event_id},
+            {"$set": {"status": "processed", "processed_at": now_utc()}},
+        )
+
+    return {"received": True, "event_id": event_id, "type": event_type}
+
+
+async def _handle_checkout_session_paid(session: Dict[str, Any], event_id: str) -> None:
+    """Mark the matching purchase row as paid and (implicitly) unlock the tier.
+    Tier resolution happens at read time in services/personalization.active_tier()
+    by reading the user's most recent paid purchase per avatar — so simply
+    flipping `status` to "paid" with the timestamp is enough.
+    """
+    session_id = session.get("id") or ""
+    if not session_id:
+        log.warning("Webhook session missing id; event=%s", event_id)
+        return
+
+    payment_status = session.get("payment_status") or ""  # 'paid', 'unpaid', 'no_payment_required'
+    if payment_status not in ("paid", "no_payment_required"):
+        log.info("Webhook session %s payment_status=%s — not marking paid", session_id, payment_status)
+        return
+
+    metadata = session.get("metadata") or {}
+    # Locate the purchase row. Prefer the stripe_session_id we stored at create time.
+    purchase = await db.purchases.find_one({"stripe_session_id": session_id})
+    if not purchase:
+        # Fallback: try by metadata.purchase_id (in case the row was created differently)
+        pid = metadata.get("purchase_id")
+        if pid:
+            purchase = await db.purchases.find_one({"id": pid})
+
+    if not purchase:
+        log.warning("Webhook: no purchase row found for session_id=%s (event=%s)", session_id, event_id)
+        return
+
+    # Idempotent on the row itself — only flip from non-paid to paid
+    if purchase.get("status") == "paid":
+        return
+
+    update = {
+        "status": "paid",
+        "paid_at": now_utc(),
+        "paid_via_webhook": True,
+        "stripe_event_id": event_id,
+    }
+    # Capture additional metadata if missing on the row
+    if not purchase.get("amount") and session.get("amount_total"):
+        update["amount"] = int(session["amount_total"])
+    if not purchase.get("currency") and session.get("currency"):
+        update["currency"] = str(session["currency"]).lower()
+
+    await db.purchases.update_one(
+        {"_id": purchase["_id"]},
+        {"$set": update},
+    )
+    log.info(
+        "Webhook: purchase %s marked PAID (user=%s, item=%s, avatar=%s, event=%s)",
+        purchase.get("id"), purchase.get("user_id"), purchase.get("item_id"),
+        purchase.get("avatar"), event_id,
+    )
+
+
 # ---------------- Integration status (for deploy diagnostics) ----------------
 @api_router.get("/integrations/status")
 async def integrations_status():
@@ -883,3 +1020,20 @@ app.add_middleware(
 @app.on_event("shutdown")
 async def shutdown_db_client():
     mongo_client.close()
+
+
+@app.on_event("startup")
+async def _ensure_indexes():
+    """Create the indexes needed for idempotent webhook processing and fast
+    lookups. Safe to call repeatedly — `create_index` is a no-op if it already
+    exists with the same definition."""
+    try:
+        await db.stripe_events.create_index("event_id", unique=True, name="uniq_event_id")
+        await db.purchases.create_index("stripe_session_id", name="purchases_stripe_session_id")
+        await db.purchases.create_index([("user_id", 1), ("avatar", 1), ("status", 1), ("paid_at", -1)],
+                                        name="purchases_tier_lookup")
+        await db.users.create_index("email", unique=True, name="users_email")
+        await db.sessions.create_index("token", unique=True, name="sessions_token")
+        await db.profiles.create_index("user_id", unique=True, name="profiles_user_id")
+    except Exception as e:
+        log.warning("Index creation warning: %s", e)

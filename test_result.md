@@ -323,10 +323,81 @@ metadata:
 
 test_plan:
   current_focus:
-    - "Full app translation coverage (EN/RO/PL/ES/PA/UR) + Urdu text-only RTL + mic flow verification"
+    - "Login-required Stripe checkout (block guests, enrich metadata, save purchase to logged-in user)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend_new:
+  - task: "Login-required Stripe checkout + enriched metadata + email + return path"
+    implemented: true
+    working: false
+    file: "/app/backend/server.py"
+    stuck_count: 1
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Changes:
+            1) `CheckoutCreateRequest` now accepts optional `user_email`, `avatar_id`, `return_path`, `chat_path` in addition to the existing `user_id`/`item_id`/`success_url`/`cancel_url`.
+            2) `POST /api/payments/checkout` now REJECTS anonymous (guest) payments:
+               - Returns HTTP 401 with detail "login_required" when `user_id` is empty OR does not start with `u_` (registered users only).
+               - Returns HTTP 401 with detail "login_required" when the user_id is not present in the `users` collection.
+               - Returns HTTP 400 with detail "email_required" when the user has no email on file AND the request omitted `user_email`.
+            3) Stripe metadata enrichment (all values stringified per Stripe spec):
+               - purchase_id, user_id, user_email, item_id, service_id (alias), avatar, avatar_id, kind, return_path (capped at 200 chars).
+            4) `purchases` row stores: user_id, user_email, user_name, avatar, avatar_id, item_id, service_id, return_path — so the webhook + status polling can identify owner without re-querying Stripe.
+
+            Required tests (against public ingress URL):
+            (1) POST /api/payments/checkout with body that omits `user_id` → expect 401 with detail="login_required".
+            (2) POST /api/payments/checkout with user_id="g_xxxx" (guest prefix) → expect 401 with detail="login_required".
+            (3) POST /api/payments/checkout with user_id="u_fake_does_not_exist" → expect 401 with detail="login_required".
+            (4) Happy path:
+                  a) POST /api/auth/signup with random email & password → grab `user.user_id` (starts with u_) and `user.email`.
+                  b) POST /api/payments/checkout with that user_id, valid item_id="jobs-3" (or any catalog item — call /api/integrations/status or just try "jobs-3"), success_url and cancel_url. Backend may proxy Stripe → expect 200 with {purchase_id, session_id, url, amount, currency}.
+                  c) Look up `db.purchases.find_one({stripe_session_id: <session>})` — it must include user_id (u_*), user_email (lowercased), avatar_id, item_id, service_id, return_path (if sent).
+                  d) (If Stripe proxy responds:) The Stripe Checkout Session object metadata should contain purchase_id, user_id, user_email, item_id, service_id, avatar, avatar_id, kind. This may be hard to read via /api/payments/status if the proxy returns 502; OK to skip this sub-check.
+            (5) When `user_email` is sent explicitly different from the DB user.email, the backend prefers the request value (lowercased). Verify the purchases row reflects the explicit email.
+            (6) When `return_path` is sent, it's stored on the purchases row.
+            (7) Regression: existing webhook handler still flips the purchase row from pending → paid when fed a synthetic checkout.session.completed payload referencing the session_id from (4). Verify status="paid", paid_at set, paid_via_webhook=True, stripe_event_id captured.
+            (8) Stripe checkout no longer accepts unknown item_id (404 still).
+
+            Reference credentials for signup/login (create with email signup_test_<ts>@example.com / password "abcdef123").
+        - working: false
+          agent: "testing"
+          comment: |
+            Login-required Stripe checkout suite executed via /app/backend_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **11/12 sub-assertions PASS; 1 FAIL on webhook enrichment fields.**
+
+            ✅ PASS — Scenario 1: POST /api/payments/checkout with empty user_id → HTTP 401, detail="login_required".
+            ✅ PASS — Scenario 2: POST /api/payments/checkout with user_id="g_<hex>" (guest prefix) → HTTP 401, detail="login_required".
+            ✅ PASS — Scenario 3: POST /api/payments/checkout with user_id="u_does_not_exist_<hex>" (unknown user) → HTTP 401, detail="login_required".
+            ✅ PASS — Scenario "email_required": Inserted a user row in db.users with email="" and called /payments/checkout w/o user_email → HTTP 400, detail="email_required".
+            ✅ PASS — Scenario 4a/4b/4c: Happy path.
+                4a) Signup via /api/auth/signup (Priya Patel + random email + ValidPass123!) returned u_* user_id and lowercased email. POST /payments/checkout with user_id, user_email, item_id="jobs-3", success_url, cancel_url, avatar_id="maya", return_path="/chat?avatar=maya" → 200 with {purchase_id, session_id, url, amount, currency}. All 5 required keys present.
+                4b) amount=399, currency="gbp" (matches catalog `jobs-3`).
+                4c) DB row in `purchases` (found by stripe_session_id) contains the FULL enriched set: user_id="u_..." ✓, starts with "u_" ✓, user_email lowercased ✓, user_name="Priya Patel" ✓, avatar_id="maya" ✓, item_id="jobs-3" ✓, service_id="jobs-3" ✓, return_path="/chat?avatar=maya" ✓, status="pending" ✓. Row keys: ['_id','amount','avatar','avatar_id','created_at','currency','id','item_id','item_title','kind','return_path','service_id','status','stripe_session_id','stripe_url','user_email','user_id','user_name'].
+                NOTE: STRIPE_API_KEY is `sk_test_emergent` and the emergent proxy returned response_code=200 to /stripe/v1/checkout/sessions (visible in backend logs), so the stub is responsive.
+            ✅ PASS — Scenario 5: When `user_email` is sent explicitly different from db.users.email, the purchases row stores the request value lowercased (`override_<hex>@example.com`). Confirmed.
+            ✅ PASS — Scenario 6: `return_path` from request is persisted on the purchases row.
+            ✅ PASS — Scenario 8: POST /payments/checkout with item_id="no-such-item-zzz" → HTTP 404 detail="Unknown item".
+
+            ❌ FAIL — Scenario 7: Webhook flips pending→paid BUT does NOT enrich row with `paid_via_webhook=true` or `stripe_event_id`.
+                • Synthesised a `checkout.session.completed` event referencing the happy-path session_id and POSTed to /api/payments/webhook → HTTP 200, body {"received":true}.
+                • DB row IS flipped: status="paid" ✓, paid_at=datetime(...) ✓.
+                • But: `paid_via_webhook=None` ✗ and `stripe_event_id=None` ✗. The row does NOT receive the enriched marker.
+                • ROOT CAUSE: There are TWO route handlers registered on POST /api/payments/webhook:
+                    (a) Line 743 — `payments_webhook` — calls emergentintegrations `sc.handle_webhook(body, sig)`; on success it only sets {status:"paid", paid_at}.
+                    (b) Line 860 — `stripe_webhook` — uses the official Stripe SDK with signature verification and the `_handle_checkout_session_paid` helper (line 937) that sets the enriched fields {paid_via_webhook:true, stripe_event_id}.
+                  FastAPI / Starlette dispatches to the FIRST registered route for any duplicate (path, method), so handler (a) wins and handler (b) is dead code. Hence the enriched fields are never written.
+                • IMPACT: Functional payment flow still works (status flips, paid_at set), but the additional audit fields required by the spec are missing. Also, `_handle_checkout_session_paid`'s idempotency guard (via `db.stripe_events`) is bypassed — replay protection relies on Stripe's signature only.
+                • ✅ PASS — Scenario 7b (sub-check): Replaying the same payload returned 200 and the row stayed status="paid" with the same (None) stripe_event_id — i.e. the row is at least not corrupted. So idempotency at the simple level holds.
+
+            ACTION REQUIRED FOR MAIN AGENT:
+                Remove the duplicate webhook handler at line 743 (or rename its path) so that the richer handler at line 860 (`stripe_webhook` + `_handle_checkout_session_paid`) is the one invoked. The richer handler also needs STRIPE_WEBHOOK_SECRET to be set in /app/backend/.env (currently empty); without it the handler returns 500 by design. If the intent is to accept unsigned webhooks in the sandbox, either (i) make signature verification conditional on STRIPE_WEBHOOK_SECRET being present, or (ii) merge the two handlers into one that writes the enriched fields unconditionally.
+
+            VERDICT: 11/12 PASS. The login-required guard, email_required, response shape, DB enrichment (user_email/user_name/avatar_id/service_id/return_path), explicit-email override, and 404-on-unknown-item are all working correctly. The single FAIL is on webhook enrichment fields (paid_via_webhook + stripe_event_id) caused by a duplicate-route registration that shadows the richer handler.
 
 frontend_new:
   - task: "Full app translation coverage (EN/RO/PL/ES/PA/UR) + Urdu text-only RTL + mic flow verification"
@@ -482,3 +553,25 @@ agent_communication:
           • Per-button x-position assertion on chat header/input-row — the harness window.innerWidth stayed at 1920 despite set_viewport_size(390,844) so geometric mobile checks couldn't be performed. Main agent's defensive `direction:'ltr'` fix in chat.tsx prevents flipping regardless of viewport.
 
         ACTION FOR MAIN AGENT: None. No defects found, no fixes required. Task can be marked complete. The translation + RTL + chip-removal work is fully verified at the semantic / DOM / language level.
+    - agent: "testing"
+      message: |
+        Login-required Stripe checkout backend suite executed via /app/backend_test.py against the public ingress URL. **11/12 sub-assertions PASS, 1 FAIL.**
+
+        ✅ Scenarios 1–3: All three login-required guards work. Missing user_id, guest `g_*` user_id, and unknown `u_*` user_id all return HTTP 401 with detail="login_required".
+        ✅ email_required: User with empty email + request omitting user_email → HTTP 400 detail="email_required".
+        ✅ Scenario 4 (happy path): /api/auth/signup → /payments/checkout w/ jobs-3 → 200 with {purchase_id, session_id, url, amount=399, currency=gbp}. DB row in `purchases` has the full enriched set: user_id (u_*), user_email (lowercased), user_name, avatar_id="maya", item_id, service_id, return_path, status="pending". Emergent Stripe proxy returned 200 (visible in backend logs) — session_id is real.
+        ✅ Scenario 5: Explicit user_email in request overrides db.users.email and is stored lowercased on the purchases row.
+        ✅ Scenario 6: return_path from request is persisted on the purchases row.
+        ✅ Scenario 8: Unknown item_id → HTTP 404 detail="Unknown item".
+
+        ❌ Scenario 7: Webhook flips status pending→paid AND sets paid_at, BUT does NOT set `paid_via_webhook=true` or `stripe_event_id`. ROOT CAUSE: TWO route handlers are registered on POST /api/payments/webhook in server.py:
+            (a) Line 743 `payments_webhook` — minimal handler, uses emergentintegrations.handle_webhook, only writes {status, paid_at}.
+            (b) Line 860 `stripe_webhook` — richer handler with `_handle_checkout_session_paid` (line 937) that writes {paid_via_webhook:true, stripe_event_id, …} and uses `db.stripe_events` for idempotency. Requires STRIPE_WEBHOOK_SECRET (currently empty in /app/backend/.env).
+        FastAPI dispatches to the FIRST registered route, so (a) wins and (b) is dead code. Hence the enriched fields specified in the test plan are never written. Replaying the same event also returns 200 and leaves the row unchanged (simple idempotency holds), but the spec-required audit fields remain absent.
+
+        ACTION REQUIRED — Main agent must:
+        1) Remove (or rename) the duplicate handler at server.py line 743 so the richer handler at line 860 is reachable, OR merge the two so a single handler writes the enriched fields.
+        2) Either set STRIPE_WEBHOOK_SECRET, or make signature verification conditional on its presence so unsigned sandbox webhooks still flow through `_handle_checkout_session_paid`. (Currently the richer handler returns 500 when the secret is empty.)
+        3) After the fix, re-run Scenario 7 to confirm `paid_via_webhook=true` + `stripe_event_id` are written to the purchases row.
+
+        VERDICT: Login-required guard + email_required + enriched purchases row + 404 on unknown item_id are all fully working. The webhook-side enrichment is broken due to a duplicate-route registration that shadows the richer handler.

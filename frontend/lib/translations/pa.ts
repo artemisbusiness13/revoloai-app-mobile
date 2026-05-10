@@ -146,6 +146,8 @@ const pa: Translations = {
     cancelledTitle: "ਭੁਗਤਾਨ ਰੱਦ", cancelledMsg: "ਚੈੱਕਆਊਟ ਸੈਸ਼ਨ ਖ਼ਤਮ ਹੋ ਗਿਆ।",
     confirmedTitle: "ਭੁਗਤਾਨ ਪੁਸ਼ਟੀ", confirmedSub: "{name} ਨਾਲ ਤੁਹਾਡਾ ਸੈਸ਼ਨ ਤਿਆਰ ਹੈ।",
     startSession: "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",
+    loginRequiredTitle: "ਲਾਗਇਨ ਲੋੜੀਂਦਾ",
+    loginRequired: "ਕਿਰਪਾ ਕਰਕੇ ਭੁਗਤਾਨ ਤੋਂ ਪਹਿਲਾਂ ਇੱਕ ਖਾਤਾ ਬਣਾਓ ਜਾਂ ਲਾਗਇਨ ਕਰੋ ਤਾਂ ਜੋ ਅਸੀਂ ਤੁਹਾਡੀ ਸੇਵਾ ਨੂੰ ਚਾਲੂ ਕਰ ਸਕੀਏ।",
   },
   jobs: {
     title: "ਮੇਲ ਖਾਂਦੀਆਂ ਨੌਕਰੀਆਂ", forRole: "{role} ਲਈ",

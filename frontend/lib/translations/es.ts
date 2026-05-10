@@ -146,6 +146,8 @@ const es: Translations = {
     cancelledTitle: "Pago cancelado", cancelledMsg: "La sesión de pago expiró.",
     confirmedTitle: "Pago confirmado", confirmedSub: "Tu sesión con {name} está lista.",
     startSession: "Iniciar sesión",
+    loginRequiredTitle: "Inicio de sesión requerido",
+    loginRequired: "Crea una cuenta o inicia sesión antes de pagar para que podamos activar tu servicio.",
   },
   jobs: {
     title: "Empleos coincidentes", forRole: "para {role}",

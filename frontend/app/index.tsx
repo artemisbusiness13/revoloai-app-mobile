@@ -14,7 +14,7 @@ import {
   Linking,
   ActivityIndicator,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
@@ -411,6 +411,16 @@ export default function Home() {
   const [signInPwd, setSignInPwd] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInErr, setSignInErr] = useState<string | null>(null);
+  // Open the signin modal when redirected here with ?signin=1 (e.g. from
+  // /checkout when the user is not logged in).
+  const homeParams = useLocalSearchParams<{ signin?: string; paid?: string }>();
+  useEffect(() => {
+    if (homeParams?.signin === "1" && !auth.user) {
+      setSignInMode("signup");
+      setSignInOpen(true);
+    }
+  }, [homeParams?.signin, auth.user]);
+
   // Trust modal
   const [trustModal, setTrustModal] = useState<null | { title: string; body: string }>(null);
   // Conversation demo state
@@ -447,6 +457,7 @@ export default function Home() {
     const sp = new URLSearchParams(window.location.search);
     const paid = sp.get("paid");
     const sess = sp.get("session");
+    const paidAvatar = sp.get("avatar") || "";
     const cancelled = sp.get("cancelled");
     if (paid === "1" && sess) {
       (async () => {
@@ -457,6 +468,10 @@ export default function Home() {
         } catch {}
         // clean URL
         window.history.replaceState({}, "", window.location.pathname);
+        // Return user to the correct chat/service after confirmation.
+        if (paidAvatar && ["maya", "sofia", "aria"].includes(paidAvatar)) {
+          router.replace({ pathname: "/chat", params: { avatar: paidAvatar } });
+        }
       })();
     } else if (cancelled === "1") {
       window.history.replaceState({}, "", window.location.pathname);
@@ -466,7 +481,11 @@ export default function Home() {
   const reloadAccount = useCallback(async () => {
     try {
       setAccountLoading(true);
-      const uid = await getOrCreateUserId();
+      // Prefer the authenticated user_id (u_*). Fallback to guest id when
+      // signed out so the screen still loads gracefully. Purchases from
+      // checkout are now ALWAYS linked to a u_* id (anonymous payments are
+      // blocked by the backend).
+      const uid = auth.user?.user_id || (await getOrCreateUserId());
       const [p, j] = await Promise.all([
         api<any[]>(`/purchases?user_id=${uid}`).catch(() => []),
         api<any[]>(`/saved-jobs?user_id=${uid}`).catch(() => []),
@@ -476,7 +495,7 @@ export default function Home() {
     } finally {
       setAccountLoading(false);
     }
-  }, []);
+  }, [auth.user?.user_id]);
 
   useEffect(() => {
     reloadAccount();

@@ -181,6 +181,13 @@ class CheckoutCreateRequest(BaseModel):
     item_id: str
     success_url: str
     cancel_url: str
+    # New: required for logged-in payments. The frontend must send these when
+    # the user has an authenticated session. The backend rejects anonymous
+    # (guest_id `g_...`) payments below.
+    user_email: Optional[str] = None
+    avatar_id: Optional[str] = None
+    return_path: Optional[str] = None
+    chat_path: Optional[str] = None
 
 
 # ---------------- Routes: status + avatars ----------------
@@ -600,15 +607,42 @@ async def payments_checkout(body: CheckoutCreateRequest, request: Request):
     item = catalog_svc.get(body.item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Unknown item")
+
+    # --- REQUIRE LOGGED-IN USER (no anonymous payments) ---
+    # A registered user_id starts with `u_`. Guest ids start with `g_`.
+    uid = (body.user_id or "").strip()
+    if not uid or not uid.startswith("u_"):
+        raise HTTPException(status_code=401, detail="login_required")
+
+    # Resolve user from DB to confirm they exist and capture canonical email.
+    user_row = await db.users.find_one({"user_id": uid}, {"_id": 0, "password_hash": 0})
+    if not user_row:
+        raise HTTPException(status_code=401, detail="login_required")
+
+    user_email = (body.user_email or user_row.get("email") or "").strip().lower()
+    if not user_email or "@" not in user_email:
+        raise HTTPException(status_code=400, detail="email_required")
+    user_name = user_row.get("name") or ""
+    avatar_id = (body.avatar_id or item.get("avatar") or "").strip().lower() or None
+    return_path = (body.return_path or body.chat_path or "").strip() or None
+
     sc = _get_stripe(request)
     purchase_id = str(uuid.uuid4())
-    metadata = {
+    # Stripe metadata: keep keys flat & string-typed (Stripe spec). Webhook reads
+    # these to identify which user/service the payment belongs to.
+    metadata: Dict[str, str] = {
         "purchase_id": purchase_id,
-        "user_id": body.user_id,
+        "user_id": uid,
+        "user_email": user_email,
         "item_id": body.item_id,
+        "service_id": body.item_id,
         "avatar": item["avatar"],
+        "avatar_id": avatar_id or item["avatar"],
         "kind": item["kind"],
     }
+    if return_path:
+        metadata["return_path"] = return_path[:200]  # Stripe caps metadata values at 500
+
     sess_req = CheckoutSessionRequest(
         amount=item["amount"] / 100.0,
         currency=item["currency"],
@@ -619,20 +653,31 @@ async def payments_checkout(body: CheckoutCreateRequest, request: Request):
     sess = await sc.create_checkout_session(sess_req)
     purchase = {
         "id": purchase_id,
-        "user_id": body.user_id,
+        "user_id": uid,
+        "user_email": user_email,
+        "user_name": user_name,
         "avatar": item["avatar"],
+        "avatar_id": metadata["avatar_id"],
         "item_id": body.item_id,
+        "service_id": body.item_id,
         "item_title": item["title"],
         "amount": item["amount"],
         "currency": item["currency"],
         "kind": item["kind"],
         "status": "pending",
+        "return_path": return_path,
         "stripe_session_id": sess.session_id,
         "stripe_url": sess.url,
         "created_at": now_utc(),
     }
     await db.purchases.insert_one(purchase.copy())
-    return {"purchase_id": purchase_id, "session_id": sess.session_id, "url": sess.url, "amount": item["amount"], "currency": item["currency"]}
+    return {
+        "purchase_id": purchase_id,
+        "session_id": sess.session_id,
+        "url": sess.url,
+        "amount": item["amount"],
+        "currency": item["currency"],
+    }
 
 
 @api_router.get("/payments/status/{session_id}")

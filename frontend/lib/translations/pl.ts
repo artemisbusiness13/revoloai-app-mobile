@@ -147,6 +147,8 @@ const pl: Translations = {
     cancelledTitle: "Płatność anulowana", cancelledMsg: "Sesja płatności wygasła.",
     confirmedTitle: "Płatność potwierdzona", confirmedSub: "Twoja sesja z {name} jest gotowa.",
     startSession: "Rozpocznij sesję",
+    loginRequiredTitle: "Wymagane logowanie",
+    loginRequired: "Utwórz konto lub zaloguj się przed płatnością, abyśmy mogli aktywować Twoją usługę.",
   },
   jobs: {
     title: "Dopasowane oferty", forRole: "dla {role}",

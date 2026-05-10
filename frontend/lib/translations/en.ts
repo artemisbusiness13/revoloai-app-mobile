@@ -214,6 +214,8 @@ const en: Translations = {
     confirmedTitle: "Payment confirmed",
     confirmedSub: "Your session with {name} is ready.",
     startSession: "Start session",
+    loginRequiredTitle: "Sign in required",
+    loginRequired: "Please create an account or log in before payment so we can activate your service.",
   },
   jobs: {
     title: "Matched jobs",

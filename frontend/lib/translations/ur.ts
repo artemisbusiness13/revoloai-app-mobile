@@ -146,6 +146,8 @@ const ur: Translations = {
     cancelledTitle: "ادائیگی منسوخ", cancelledMsg: "چیک آؤٹ سیشن ختم ہو گیا۔",
     confirmedTitle: "ادائیگی تصدیق شدہ", confirmedSub: "{name} کے ساتھ آپ کا سیشن تیار ہے۔",
     startSession: "سیشن شروع کریں",
+    loginRequiredTitle: "لاگ ان درکار ہے",
+    loginRequired: "براہ کرم ادائیگی سے پہلے اکاؤنٹ بنائیں یا لاگ ان کریں تاکہ ہم آپ کی سروس کو فعال کر سکیں۔",
   },
   jobs: {
     title: "میچ کی گئی نوکریاں", forRole: "{role} کے لیے",

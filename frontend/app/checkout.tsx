@@ -24,12 +24,13 @@ import {
   AVATAR_META,
   AvatarKey,
   api,
-  getOrCreateUserId,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { useAuth } from "../lib/auth";
 
 export default function CheckoutScreen() {
   const { t } = useI18n();
+  const { user, ready: authReady } = useAuth();
   const params = useLocalSearchParams<{
     avatar?: string;
     item_id?: string;
@@ -52,6 +53,24 @@ export default function CheckoutScreen() {
   const [done, setDone] = useState(false);
   const [pollSession, setPollSession] = useState<string | null>(null);
   const fade = useRef(new Animated.Value(0)).current;
+
+  // Guard: require logged-in user with email BEFORE allowing any payment action.
+  // We show a friendly message and redirect to home with `?signin=1` so the
+  // signin modal opens automatically.
+  useEffect(() => {
+    if (!authReady) return;
+    if (!user || !user.email) {
+      const msg = t("checkout.loginRequired");
+      if (Platform.OS === "web") {
+        try { window.alert(msg); } catch {}
+        router.replace({ pathname: "/", params: { signin: "1" } });
+      } else {
+        Alert.alert(t("checkout.loginRequiredTitle"), msg, [
+          { text: t("common.gotIt"), onPress: () => router.replace({ pathname: "/", params: { signin: "1" } }) },
+        ]);
+      }
+    }
+  }, [authReady, user, t]);
 
   useEffect(() => {
     if (done) {
@@ -101,6 +120,17 @@ export default function CheckoutScreen() {
 
   const pay = async () => {
     if (paying || done) return;
+    // Hard gate: must be logged in with email. Surfaced to user.
+    if (!user || !user.email) {
+      const msg = t("checkout.loginRequired");
+      if (Platform.OS === "web") {
+        try { window.alert(msg); } catch {}
+      } else {
+        Alert.alert(t("checkout.loginRequiredTitle"), msg);
+      }
+      router.replace({ pathname: "/", params: { signin: "1" } });
+      return;
+    }
     if (method === "paypal") {
       Alert.alert(t("checkout.paypalSoonTitle"), t("checkout.paypalSoonMsg"));
       return;
@@ -108,16 +138,27 @@ export default function CheckoutScreen() {
     setPaying(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
-      const user_id = await getOrCreateUserId();
+      const user_id = user.user_id;
+      const user_email = user.email;
       const origin = Platform.OS === "web"
         ? (typeof window !== "undefined" ? window.location.origin : "")
         : "";
+      // Where to send the user after payment confirmation (post webhook). The
+      // backend stores this on the purchase row for the success-poll logic to
+      // pick up. We also forward it as a query param on success_url for legacy
+      // redirect handling.
+      const return_path = `/chat?avatar=${encodeURIComponent(key)}`;
       const r = await api<{ url: string; session_id: string }>("/payments/checkout", {
         method: "POST",
         body: JSON.stringify({
           user_id,
+          user_email,
           item_id: item.id,
-          success_url: `${origin}/?paid=1&session={CHECKOUT_SESSION_ID}`,
+          service_id: item.id,
+          avatar_id: key,
+          return_path,
+          chat_path: return_path,
+          success_url: `${origin}/?paid=1&session={CHECKOUT_SESSION_ID}&avatar=${encodeURIComponent(key)}`,
           cancel_url: `${origin}/?cancelled=1`,
         }),
       });
@@ -128,7 +169,18 @@ export default function CheckoutScreen() {
         await Linking.openURL(r.url);
       }
     } catch (e: any) {
-      Alert.alert(t("checkout.payFailed"), e?.message || t("common.retry"));
+      const msg = String(e?.message || "");
+      // Backend returned 401/400 for missing auth/email — surface clean message
+      if (msg.includes("login_required") || msg.includes("401")) {
+        const m = t("checkout.loginRequired");
+        if (Platform.OS === "web") { try { window.alert(m); } catch {} }
+        else Alert.alert(t("checkout.loginRequiredTitle"), m);
+        router.replace({ pathname: "/", params: { signin: "1" } });
+      } else if (msg.includes("email_required")) {
+        Alert.alert(t("checkout.payFailed"), t("checkout.loginRequired"));
+      } else {
+        Alert.alert(t("checkout.payFailed"), msg || t("common.retry"));
+      }
       setPaying(false);
     }
   };

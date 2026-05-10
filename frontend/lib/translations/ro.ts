@@ -214,6 +214,8 @@ const ro: Translations = {
     confirmedTitle: "Plată confirmată",
     confirmedSub: "Sesiunea ta cu {name} este gata.",
     startSession: "Începe sesiunea",
+    loginRequiredTitle: "Conectare necesară",
+    loginRequired: "Te rugăm să creezi un cont sau să te conectezi înainte de plată ca să-ți putem activa serviciul.",
   },
   jobs: {
     title: "Joburi potrivite",

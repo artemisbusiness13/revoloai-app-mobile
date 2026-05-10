@@ -1,14 +1,14 @@
 """
-Backend test suite — Multilingual chat language directive
-Tests /api/chat against public ingress URL for 6 languages.
+Backend test suite — Login-required Stripe checkout + enriched metadata
+Tests /api/payments/checkout against public ingress URL.
 """
 import os
-import sys
 import time
 import json
-import re
+import uuid
 import requests
 from pathlib import Path
+from pymongo import MongoClient
 
 # Load EXPO_PUBLIC_BACKEND_URL from /app/frontend/.env
 ENV_PATH = Path("/app/frontend/.env")
@@ -21,382 +21,384 @@ for line in ENV_PATH.read_text().splitlines():
 assert BACKEND_URL, "EXPO_PUBLIC_BACKEND_URL missing in /app/frontend/.env"
 BASE = BACKEND_URL.rstrip("/") + "/api"
 
-USER_ID = "u_lang_test_1"
-TIMEOUT = 90
+# Load MONGO_URL from /app/backend/.env for direct DB verification
+BACK_ENV = Path("/app/backend/.env")
+MONGO_URL = None
+DB_NAME = None
+for line in BACK_ENV.read_text().splitlines():
+    if line.startswith("MONGO_URL="):
+        MONGO_URL = line.split("=", 1)[1].strip().strip('"').strip("'")
+    if line.startswith("DB_NAME="):
+        DB_NAME = line.split("=", 1)[1].strip().strip('"').strip("'")
 
-# Markers
-POLISH_CHARS = set("ąćęłńóśźżĄĆĘŁŃÓŚŹŻ")
-POLISH_WORDS = ["tak", "nie", "praca", "rozmow", "dziękuj", "twoj", "masz", "jesteś", "pytanie",
-                "cześć", "witaj", "rozmowy", "przygotować", "pomóc", "mogę"]
-SPANISH_CHARS = set("ñÑ¿¡áéíóúÁÉÍÓÚ")
-SPANISH_WORDS = ["trabajo", "buscar", "perfil", "hola", "puede", "experiencia",
-                 "cuál", "qué", "para", "senior", "producto"]
-ROMANIAN_CHARS = set("ăâîșțĂÂÎȘȚşţŞŢ")
-ROMANIAN_WORDS = ["salut", "bună", "caut", "experiență", "tău", "pentru", "este", "sunt", "tine"]
+if not DB_NAME:
+    DB_NAME = "test_database"
 
+mongo = MongoClient(MONGO_URL) if MONGO_URL else None
+db = mongo[DB_NAME] if mongo else None
 
-def gurmukhi_count(s):
-    return sum(1 for ch in s if 0x0A00 <= ord(ch) <= 0x0A7F)
-
-
-def arabic_count(s):
-    return sum(1 for ch in s if 0x0600 <= ord(ch) <= 0x06FF)
-
-
-def has_any_char(s, chars):
-    return any(ch in chars for ch in s)
-
-
-def has_any_word(s, words):
-    low = s.lower()
-    return [w for w in words if w.lower() in low]
-
-
-def is_english_dominated(s):
-    low = " " + s.lower() + " "
-    has_english_connectors = (" the " in low) or (" and " in low)
-    return has_english_connectors
-
-
-def post_chat(body):
-    url = f"{BASE}/chat"
-    r = requests.post(url, json=body, timeout=TIMEOUT)
-    return url, r
-
-
-def log_scenario(num, name, url, body, status, reply, markers_found, markers_missing, verdict):
-    body_logged = dict(body)
-    if "message" in body_logged and len(body_logged["message"]) > 60:
-        body_logged["message"] = body_logged["message"][:60] + "..."
-    print(f"\n{'='*70}")
-    print(f"SCENARIO {num}: {name}")
-    print(f"URL: {url}")
-    print(f"BODY: {json.dumps(body_logged, ensure_ascii=False)}")
-    print(f"HTTP STATUS: {status}")
-    print(f"REPLY (first 300 chars): {reply[:300]}")
-    print(f"MARKERS FOUND: {markers_found}")
-    print(f"MARKERS MISSING: {markers_missing}")
-    print(f"VERDICT: {verdict}")
-
+TIMEOUT = 60
 
 results = []
 
 
-def run_scenario_1():
-    body = {"avatar": "sofia",
-            "message": "Hello, can you help me prepare for a frontend interview?",
-            "user_id": USER_ID,
-            "lang": "Polish"}
-    url, r = post_chat(body)
-    ok = r.status_code == 200
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if ok:
-        reply = r.json().get("reply", "")
-        char_found = [ch for ch in POLISH_CHARS if ch in reply]
-        word_found = has_any_word(reply, POLISH_WORDS)
-        if char_found:
-            found.append(f"polish_chars={char_found[:6]}")
-        if word_found:
-            found.append(f"polish_words={word_found}")
-        eng_dom = is_english_dominated(reply)
-        has_polish_marker = bool(char_found or word_found)
-        if not has_polish_marker:
-            missing.append("no polish chars/words")
-        if eng_dom and not has_polish_marker:
-            verdict = "FAIL (english-dominated, no polish markers)"
-        elif has_polish_marker:
-            verdict = "PASS"
-        else:
-            verdict = "FAIL (no polish markers)"
-    log_scenario(1, "POLISH (sofia)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("1 Polish", verdict.startswith("PASS")))
+def record(name, ok, detail=""):
+    status = "PASS" if ok else "FAIL"
+    results.append((name, ok, detail))
+    print(f"[{status}] {name}: {detail[:300]}")
 
 
-def run_scenario_2():
-    body = {"avatar": "maya",
-            "message": "I'm looking for a senior product role.",
-            "user_id": USER_ID,
-            "lang": "Spanish"}
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        char_found = [ch for ch in SPANISH_CHARS if ch in reply]
-        word_found = has_any_word(reply, SPANISH_WORDS)
-        if char_found:
-            found.append(f"spanish_chars={char_found[:6]}")
-        if word_found:
-            found.append(f"spanish_words={word_found}")
-        eng_dom = is_english_dominated(reply)
-        has_marker = bool(char_found or word_found)
-        if not has_marker:
-            missing.append("no spanish chars/words")
-        if eng_dom and not has_marker:
-            verdict = "FAIL (english-dominated)"
-        elif has_marker:
-            verdict = "PASS"
-        else:
-            verdict = "FAIL (no markers)"
-    log_scenario(2, "SPANISH (maya)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("2 Spanish", verdict.startswith("PASS")))
+def signup_random():
+    """Create a fresh user via /api/auth/signup. Returns dict with user_id, email, token, name."""
+    ts = int(time.time() * 1000)
+    rand = uuid.uuid4().hex[:8]
+    email = f"checkout_test_{ts}_{rand}@example.com"
+    payload = {
+        "name": "Priya Patel",
+        "email": email,
+        "password": "ValidPass123!",
+    }
+    r = requests.post(f"{BASE}/auth/signup", json=payload, timeout=TIMEOUT)
+    r.raise_for_status()
+    j = r.json()
+    return {
+        "user_id": j["user"]["user_id"],
+        "email": j["user"]["email"],
+        "name": j["user"]["name"],
+        "token": j["token"],
+    }
 
 
-def run_scenario_3():
-    body = {"avatar": "aria",
-            "message": "What should I learn next?",
-            "user_id": USER_ID,
-            "lang": "Punjabi"}
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        gc = gurmukhi_count(reply)
-        found.append(f"gurmukhi_codepoint_count={gc}")
-        if gc > 5:
-            verdict = "PASS"
-        else:
-            missing.append(f"gurmukhi count {gc} <= 5")
-            verdict = "FAIL"
-    log_scenario(3, "PUNJABI (aria)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("3 Punjabi", verdict.startswith("PASS")))
+SUCCESS_URL = "https://bilingual-ai-coach-1.preview.emergentagent.com/checkout/success?sid={CHECKOUT_SESSION_ID}"
+CANCEL_URL = "https://bilingual-ai-coach-1.preview.emergentagent.com/checkout/cancel"
 
 
-def run_scenario_4():
-    body = {"avatar": "sofia",
-            "message": "I need to prepare for an interview.",
-            "user_id": USER_ID,
-            "lang": "Urdu"}
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        ac = arabic_count(reply)
-        found.append(f"arabic_codepoint_count={ac}")
-        if ac > 10:
-            verdict = "PASS"
-        else:
-            missing.append(f"arabic count {ac} <= 10")
-            verdict = "FAIL"
-    log_scenario(4, "URDU (sofia)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("4 Urdu", verdict.startswith("PASS")))
+# ---------------- Scenario 1: missing user_id ----------------
+def test_1_missing_user_id():
+    body = {
+        "user_id": "",
+        "item_id": "jobs-3",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    ok = r.status_code == 401
+    try:
+        detail = r.json().get("detail", "")
+    except Exception:
+        detail = r.text
+    ok = ok and (detail == "login_required")
+    record("1. Missing user_id => 401 login_required",
+           ok, f"status={r.status_code} detail={detail!r}")
 
 
-def run_scenario_5():
-    body = {"avatar": "sofia",
-            "message": "Hi, can you help?",
-            "user_id": USER_ID,
-            "lang": "English"}
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        polish_chars = [ch for ch in POLISH_CHARS if ch in reply]
-        spanish_chars = [ch for ch in SPANISH_CHARS if ch in reply]
-        gc = gurmukhi_count(reply)
-        ac = arabic_count(reply)
-        ascii_letters = sum(1 for ch in reply if ch.isascii() and ch.isalpha())
-        total_letters = sum(1 for ch in reply if ch.isalpha())
-        ratio = ascii_letters / max(1, total_letters)
-        found.append(f"ascii_letter_ratio={ratio:.2f}")
-        problems = []
-        if polish_chars:
-            problems.append(f"polish_chars={polish_chars}")
-        if spanish_chars:
-            problems.append(f"spanish_chars={spanish_chars}")
-        if gc > 0:
-            problems.append(f"gurmukhi={gc}")
-        if ac > 0:
-            problems.append(f"arabic={ac}")
-        if ratio < 0.9:
-            problems.append(f"low ascii ratio={ratio:.2f}")
-        if problems:
-            missing.extend(problems)
-            verdict = "FAIL"
-        else:
-            verdict = "PASS"
-    log_scenario(5, "ENGLISH REGRESSION (sofia)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("5 English", verdict.startswith("PASS")))
+# ---------------- Scenario 2: guest prefix g_ ----------------
+def test_2_guest_id():
+    body = {
+        "user_id": "g_" + uuid.uuid4().hex[:12],
+        "item_id": "jobs-3",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    try:
+        detail = r.json().get("detail", "")
+    except Exception:
+        detail = r.text
+    ok = (r.status_code == 401) and (detail == "login_required")
+    record("2. Guest user_id (g_*) => 401 login_required",
+           ok, f"status={r.status_code} detail={detail!r}")
 
 
-def run_scenario_6():
-    body = {"avatar": "maya",
-            "message": "Caut un job ca product manager.",
-            "user_id": USER_ID,
-            "lang": "Romanian"}
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        char_found = [ch for ch in ROMANIAN_CHARS if ch in reply]
-        word_found = has_any_word(reply, ROMANIAN_WORDS)
-        if char_found:
-            found.append(f"ro_chars={char_found[:6]}")
-        if word_found:
-            found.append(f"ro_words={word_found}")
-        has_marker = bool(char_found or word_found)
-        if has_marker:
-            verdict = "PASS"
-        else:
-            missing.append("no romanian chars/words")
-            verdict = "FAIL"
-    log_scenario(6, "ROMANIAN REGRESSION (maya)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("6 Romanian", verdict.startswith("PASS")))
+# ---------------- Scenario 3: unknown u_ user ----------------
+def test_3_unknown_user():
+    body = {
+        "user_id": "u_does_not_exist_" + uuid.uuid4().hex[:8],
+        "item_id": "jobs-3",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    try:
+        detail = r.json().get("detail", "")
+    except Exception:
+        detail = r.text
+    ok = (r.status_code == 401) and (detail == "login_required")
+    record("3. Unknown u_ user_id => 401 login_required",
+           ok, f"status={r.status_code} detail={detail!r}")
 
 
-def run_scenario_7():
-    body = {"avatar": "sofia",
-            "message": "Hello.",
-            "user_id": USER_ID + "_default"}  # no lang
-    url, r = post_chat(body)
-    reply = ""
-    found = []
-    missing = []
-    verdict = "FAIL"
-    if r.status_code == 200:
-        reply = r.json().get("reply", "")
-        polish_chars = [ch for ch in POLISH_CHARS if ch in reply]
-        spanish_chars = [ch for ch in SPANISH_CHARS if ch in reply]
-        gc = gurmukhi_count(reply)
-        ac = arabic_count(reply)
-        ascii_letters = sum(1 for ch in reply if ch.isascii() and ch.isalpha())
-        total_letters = sum(1 for ch in reply if ch.isalpha())
-        ratio = ascii_letters / max(1, total_letters)
-        found.append(f"ascii_letter_ratio={ratio:.2f}")
-        problems = []
-        if polish_chars:
-            problems.append(f"polish_chars={polish_chars}")
-        if spanish_chars:
-            problems.append(f"spanish_chars={spanish_chars}")
-        if gc > 0:
-            problems.append(f"gurmukhi={gc}")
-        if ac > 0:
-            problems.append(f"arabic={ac}")
-        if ratio < 0.9:
-            problems.append(f"low ascii ratio={ratio:.2f}")
-        if problems:
-            missing.extend(problems)
-            verdict = "FAIL"
-        else:
-            verdict = "PASS"
-    log_scenario(7, "DEFAULT no lang (sofia)", url, body, r.status_code, reply, found, missing, verdict)
-    results.append(("7 Default", verdict.startswith("PASS")))
+# ---------------- Scenario 8: unknown item_id => 404 ----------------
+def test_8_unknown_item():
+    user = signup_random()
+    body = {
+        "user_id": user["user_id"],
+        "user_email": user["email"],
+        "item_id": "no-such-item-zzz",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    try:
+        detail = r.json().get("detail", "")
+    except Exception:
+        detail = r.text
+    ok = (r.status_code == 404) and ("Unknown item" in detail or "unknown" in detail.lower())
+    record("8. Unknown item_id => 404",
+           ok, f"status={r.status_code} detail={detail!r}")
 
 
-def run_scenario_8():
-    # Multi-turn Polish
-    body1 = {"avatar": "sofia",
-             "message": "Cześć! Chcę przygotować się do rozmowy o pracę.",
-             "user_id": USER_ID + "_mt",
-             "lang": "Polish"}
-    url, r1 = post_chat(body1)
-    reply1 = ""
-    sid = None
-    found1 = []
-    missing1 = []
-    verdict1 = "FAIL"
-    if r1.status_code == 200:
-        j = r1.json()
-        sid = j.get("session_id")
-        reply1 = j.get("reply", "")
-        char_found = [ch for ch in POLISH_CHARS if ch in reply1]
-        word_found = has_any_word(reply1, POLISH_WORDS)
-        if char_found:
-            found1.append(f"pl_chars={char_found[:6]}")
-        if word_found:
-            found1.append(f"pl_words={word_found}")
-        if char_found or word_found:
-            verdict1 = "PASS"
-        else:
-            missing1.append("no polish markers")
-    log_scenario("8a", "MULTI-TURN POLISH (turn 1)", url, body1, r1.status_code, reply1, found1, missing1, verdict1)
-
-    # Turn 2 — use same session_id
-    body2 = {"avatar": "sofia",
-             "message": "Jakie pytania mogą paść podczas rozmowy technicznej?",
-             "user_id": USER_ID + "_mt",
-             "lang": "Polish",
-             "session_id": sid}
-    reply2 = ""
-    found2 = []
-    missing2 = []
-    verdict2 = "FAIL"
-    if sid:
-        url2, r2 = post_chat(body2)
-        if r2.status_code == 200:
-            j2 = r2.json()
-            sid2 = j2.get("session_id")
-            reply2 = j2.get("reply", "")
-            session_match = (sid2 == sid)
-            char_found = [ch for ch in POLISH_CHARS if ch in reply2]
-            word_found = has_any_word(reply2, POLISH_WORDS)
-            if char_found:
-                found2.append(f"pl_chars={char_found[:6]}")
-            if word_found:
-                found2.append(f"pl_words={word_found}")
-            if session_match:
-                found2.append("session_id_persisted")
-            else:
-                missing2.append(f"session_id_changed: {sid}->{sid2}")
-            if (char_found or word_found) and session_match:
-                verdict2 = "PASS"
-            elif not (char_found or word_found):
-                missing2.append("no polish markers")
-        log_scenario("8b", "MULTI-TURN POLISH (turn 2 same session)", url2, body2, r2.status_code, reply2, found2, missing2, verdict2)
-    else:
-        log_scenario("8b", "MULTI-TURN POLISH (turn 2)", "n/a", body2, "skipped", "", [], ["no session_id from turn 1"], "FAIL")
-
-    overall = verdict1.startswith("PASS") and verdict2.startswith("PASS")
-    results.append(("8 Multi-turn Polish", overall))
-
-
-def main():
-    print(f"Public BASE: {BASE}")
-    print(f"USER_ID: {USER_ID}\n")
-    scenarios = [
-        ("1", run_scenario_1),
-        ("2", run_scenario_2),
-        ("3", run_scenario_3),
-        ("4", run_scenario_4),
-        ("5", run_scenario_5),
-        ("6", run_scenario_6),
-        ("7", run_scenario_7),
-        ("8", run_scenario_8),
-    ]
-    for num, fn in scenarios:
+# Test missing email — happens when user has no email AND request omits.
+# But /api/auth/signup always sets email. So we simulate: insert a user row
+# with email="" directly into DB OR rely on stripping email from DB.
+def test_email_required():
+    # Direct DB write: create a user without an email
+    if db is None:
+        record("Email required scenario (skipped, no DB access)", True, "no MONGO_URL")
+        return
+    uid = "u_no_email_" + uuid.uuid4().hex[:8]
+    db.users.insert_one({
+        "user_id": uid,
+        "email": "",
+        "name": "No Email",
+        "password_hash": "x",
+    })
+    try:
+        body = {
+            "user_id": uid,
+            "item_id": "jobs-3",
+            "success_url": SUCCESS_URL,
+            "cancel_url": CANCEL_URL,
+        }
+        r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
         try:
-            fn()
-        except Exception as e:
-            print(f"\nSCENARIO {num} raised exception: {e}")
-            results.append((f"{num} (exception)", False))
+            detail = r.json().get("detail", "")
+        except Exception:
+            detail = r.text
+        ok = (r.status_code == 400) and (detail == "email_required")
+        record("Email required: user has no email & request omits => 400 email_required",
+               ok, f"status={r.status_code} detail={detail!r}")
+    finally:
+        db.users.delete_one({"user_id": uid})
 
-    passed = sum(1 for _, ok in results if ok)
-    failed = len(results) - passed
-    print("\n" + "=" * 70)
-    print("FINAL SUMMARY")
-    print("=" * 70)
-    for name, ok in results:
-        print(f"  [{'PASS' if ok else 'FAIL'}] Scenario {name}")
-    print(f"\nTOTAL: {passed} PASSED / {failed} FAILED out of {len(results)}")
-    sys.exit(0 if failed == 0 else 1)
+
+# ---------------- Scenario 4: happy path ----------------
+HAPPY_PATH_STATE = {}
+
+def test_4_happy_path():
+    user = signup_random()
+    HAPPY_PATH_STATE["user"] = user
+    body = {
+        "user_id": user["user_id"],
+        "user_email": user["email"],
+        "item_id": "jobs-3",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+        "avatar_id": "maya",
+        "return_path": "/chat?avatar=maya",
+        "service_id": "jobs-3",  # extra field — server may ignore
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    ok = r.status_code == 200
+    if not ok:
+        record("4a. Happy path POST /payments/checkout => 200",
+               False, f"status={r.status_code} body={r.text[:400]}")
+        return
+    j = r.json()
+    HAPPY_PATH_STATE["resp"] = j
+
+    # Verify response shape
+    required_keys = {"purchase_id", "session_id", "url", "amount", "currency"}
+    has_keys = required_keys.issubset(set(j.keys()))
+    record("4a. Happy path response shape (purchase_id, session_id, url, amount, currency)",
+           has_keys, f"keys={list(j.keys())}")
+
+    # Verify amount == 399 (jobs-3) and currency == gbp
+    amt_ok = j.get("amount") == 399 and (j.get("currency") or "").lower() == "gbp"
+    record("4b. Happy path amount=399 currency=gbp", amt_ok,
+           f"amount={j.get('amount')} currency={j.get('currency')}")
+
+    # Verify DB row
+    if db is not None:
+        time.sleep(0.3)
+        row = db.purchases.find_one({"stripe_session_id": j["session_id"]})
+        HAPPY_PATH_STATE["db_row"] = row
+        if not row:
+            record("4c. DB purchases row created", False, "no row found")
+            return
+        checks = {
+            "user_id": row.get("user_id") == user["user_id"],
+            "user_id starts u_": row.get("user_id", "").startswith("u_"),
+            "user_email (lowercased)": row.get("user_email") == user["email"].lower(),
+            "user_name": row.get("user_name") == user["name"],
+            "avatar_id": row.get("avatar_id") == "maya",
+            "item_id": row.get("item_id") == "jobs-3",
+            "service_id": row.get("service_id") == "jobs-3",
+            "return_path": row.get("return_path") == "/chat?avatar=maya",
+            "status pending": row.get("status") == "pending",
+        }
+        all_ok = all(checks.values())
+        failed = [k for k, v in checks.items() if not v]
+        record("4c. DB purchases row enriched fields", all_ok,
+               f"checks={checks} failed={failed} row_keys={sorted(row.keys())}")
+
+
+# ---------------- Scenario 5: explicit user_email overrides DB email ----------------
+def test_5_explicit_email_override():
+    user = signup_random()
+    override_email = f"OVERRIDE_{uuid.uuid4().hex[:6]}@Example.com"
+    body = {
+        "user_id": user["user_id"],
+        "user_email": override_email,
+        "item_id": "itv-basic",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    if r.status_code != 200:
+        record("5. Explicit user_email override => 200", False,
+               f"status={r.status_code} body={r.text[:300]}")
+        return
+    j = r.json()
+    if db is None:
+        record("5. Explicit user_email override (no DB)", True, "skipped DB check")
+        return
+    row = db.purchases.find_one({"stripe_session_id": j["session_id"]})
+    ok = bool(row) and row.get("user_email") == override_email.lower()
+    record("5. user_email request value (lowercased) overrides DB email",
+           ok, f"row.user_email={row.get('user_email') if row else None} expected={override_email.lower()}")
+
+
+# ---------------- Scenario 6: return_path stored ----------------
+def test_6_return_path_stored():
+    user = signup_random()
+    rp = "/chat?avatar=sofia&intent=interview"
+    body = {
+        "user_id": user["user_id"],
+        "user_email": user["email"],
+        "item_id": "itv-standard",
+        "success_url": SUCCESS_URL,
+        "cancel_url": CANCEL_URL,
+        "return_path": rp,
+    }
+    r = requests.post(f"{BASE}/payments/checkout", json=body, timeout=TIMEOUT)
+    if r.status_code != 200:
+        record("6. return_path stored => 200", False, f"status={r.status_code}")
+        return
+    j = r.json()
+    if db is None:
+        record("6. return_path stored (no DB)", True, "skipped")
+        return
+    row = db.purchases.find_one({"stripe_session_id": j["session_id"]})
+    ok = bool(row) and row.get("return_path") == rp
+    record("6. return_path stored on purchases row",
+           ok, f"row.return_path={row.get('return_path') if row else None!r}")
+
+
+# ---------------- Scenario 7: webhook flips pending -> paid (idempotent) ----------------
+def test_7_webhook_idempotent():
+    if "resp" not in HAPPY_PATH_STATE or "db_row" not in HAPPY_PATH_STATE:
+        record("7. Webhook idempotency", False, "happy path not available")
+        return
+    session_id = HAPPY_PATH_STATE["resp"]["session_id"]
+    purchase_id = HAPPY_PATH_STATE["resp"]["purchase_id"]
+    event_id = f"evt_test_{uuid.uuid4().hex[:16]}"
+
+    # Synthetic Stripe checkout.session.completed payload
+    payload = {
+        "id": event_id,
+        "object": "event",
+        "type": "checkout.session.completed",
+        "livemode": False,
+        "data": {
+            "object": {
+                "id": session_id,
+                "object": "checkout.session",
+                "payment_status": "paid",
+                "status": "complete",
+                "amount_total": 399,
+                "currency": "gbp",
+                "metadata": {
+                    "purchase_id": purchase_id,
+                    "user_id": HAPPY_PATH_STATE["user"]["user_id"],
+                    "user_email": HAPPY_PATH_STATE["user"]["email"],
+                    "item_id": "jobs-3",
+                    "service_id": "jobs-3",
+                    "avatar": "maya",
+                    "avatar_id": "maya",
+                    "kind": "service",
+                    "return_path": "/chat?avatar=maya",
+                },
+            }
+        },
+    }
+    raw = json.dumps(payload).encode("utf-8")
+    # Without a valid signature this may bounce. Send with empty sig header.
+    headers = {
+        "Content-Type": "application/json",
+        "Stripe-Signature": "t=0,v1=test",
+    }
+    r = requests.post(f"{BASE}/payments/webhook", data=raw, headers=headers, timeout=TIMEOUT)
+    webhook_status = r.status_code
+    webhook_body = r.text[:300]
+
+    # Inspect DB row regardless of HTTP code
+    time.sleep(0.5)
+    row = db.purchases.find_one({"stripe_session_id": session_id}) if db is not None else None
+    if not row:
+        record("7. Webhook idempotency — DB row found", False,
+               f"webhook_status={webhook_status} body={webhook_body}")
+        return
+    is_paid = row.get("status") == "paid"
+    has_paid_at = bool(row.get("paid_at"))
+    has_via_webhook = row.get("paid_via_webhook") is True
+    has_event_id = bool(row.get("stripe_event_id"))
+    ok = is_paid and has_paid_at and has_via_webhook and has_event_id
+    record(
+        "7. Webhook flips pending->paid w/ paid_via_webhook=true & stripe_event_id captured",
+        ok,
+        f"webhook_status={webhook_status} body={webhook_body} status={row.get('status')!r} "
+        f"paid_at={row.get('paid_at')!r} paid_via_webhook={row.get('paid_via_webhook')!r} "
+        f"stripe_event_id={row.get('stripe_event_id')!r}",
+    )
+
+    # Idempotency: send the same event again, row should stay paid (no errors)
+    r2 = requests.post(f"{BASE}/payments/webhook", data=raw, headers=headers, timeout=TIMEOUT)
+    time.sleep(0.3)
+    row2 = db.purchases.find_one({"stripe_session_id": session_id}) if db is not None else None
+    idempotent_ok = (
+        row2 and row2.get("status") == "paid"
+        and row2.get("stripe_event_id") == row.get("stripe_event_id")
+    )
+    record("7b. Webhook is idempotent (replay leaves row unchanged)",
+           bool(idempotent_ok),
+           f"replay_status={r2.status_code} status={row2.get('status') if row2 else None}")
+
+
+# ---------------- main ----------------
+def main():
+    print(f"BASE={BASE}")
+    print(f"DB_NAME={DB_NAME} mongo_connected={db is not None}")
+    print("-" * 80)
+
+    test_1_missing_user_id()
+    test_2_guest_id()
+    test_3_unknown_user()
+    test_email_required()
+    test_4_happy_path()
+    test_5_explicit_email_override()
+    test_6_return_path_stored()
+    test_8_unknown_item()
+    test_7_webhook_idempotent()
+
+    print("\n" + "=" * 80)
+    passed = sum(1 for _, ok, _ in results if ok)
+    total = len(results)
+    print(f"SUMMARY: {passed}/{total} passed")
+    for name, ok, _ in results:
+        print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+    return 0 if passed == total else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

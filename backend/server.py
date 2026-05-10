@@ -258,6 +258,33 @@ async def chat(req: ChatRequest):
         persona["system"], profile, avatar, tier, lang_directive
     )
 
+    # If exactly ONE critical search field is missing, prepend a deterministic
+    # instruction so the model asks for that single missing field by name.
+    if profile:
+        critical = {
+            "target_role": "target_role (the job title they want)",
+            "location": "location (which city, country, or 'remote')",
+            "remote": "work setup (remote, hybrid, or onsite)",
+        }
+        missing = []
+        for k, label in critical.items():
+            v = profile.get(k)
+            if not v or (isinstance(v, str) and not v.strip()) or v in ("unknown", "any"):
+                missing.append((k, label))
+        if len(missing) == 1:
+            mk, ml = missing[0]
+            base_system += (
+                f"\n\nMISSING ONE FIELD: The user's profile is complete except for {ml}. "
+                f"In your next reply, ask ONLY for {mk} in one short, friendly sentence. "
+                f"Do not ask about any other field. Do not summarise the rest of the profile."
+            )
+        elif len(missing) == 0 and avatar == "maya":
+            base_system += (
+                "\n\nALL CORE FIELDS ARE FILLED. If the user asks to start a search, "
+                "confirm in one short sentence that you'll search using their saved "
+                "target_role, location and work setup. Do not re-ask any field."
+            )
+
     # Empty message = generate intro
     if not req.message.strip() and not history:
         intro_system = base_system + (
@@ -330,6 +357,29 @@ async def extract_profile_from_session(payload: Dict[str, Any]):
     await db.profiles.update_one({"user_id": user_id}, {"$set": extracted}, upsert=True)
     extracted.pop("updated_at", None)
     return extracted
+
+
+@api_router.get("/profile/me")
+async def get_profile_me(authorization: Optional[str] = Header(default=None)):
+    """Return the saved profile for the currently logged-in user.
+    Authentication via Bearer token. Returns the FULL profile so the avatar
+    chat / paid job search can render an accurate context summary.
+    Note: this route is registered BEFORE the dynamic /profile/{user_id}
+    route below so FastAPI doesn't match "me" as a user_id.
+    """
+    user = await auth_svc.user_from_token(db, authorization)
+    if not user:
+        raise HTTPException(status_code=401, detail="not authenticated")
+    p = await db.profiles.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if not p:
+        p = {"user_id": user["user_id"], "completed": False}
+    p.pop("updated_at", None)
+    return {
+        "ok": True,
+        "user": {"user_id": user["user_id"], "email": user.get("email", ""), "name": user.get("name", "")},
+        "profile": p,
+        "profile_completed": bool(p.get("completed")),
+    }
 
 
 @api_router.get("/profile/{user_id}")

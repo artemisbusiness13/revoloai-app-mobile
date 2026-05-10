@@ -322,8 +322,7 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "Profile-aware chat context + GET /api/profile/me + jobs use logged-in profile"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -331,11 +330,11 @@ test_plan:
 backend_new2:
   - task: "Profile-aware chat context + GET /api/profile/me + jobs use logged-in profile"
     implemented: true
-    working: false
+    working: true
     file: "/app/backend/server.py, /app/backend/services/personalization.py"
-    stuck_count: 1
+    stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: "NA"
           agent: "main"
@@ -407,6 +406,23 @@ backend_new2:
               1) **CRITICAL** — Move the `@api_router.get("/profile/me")` route registration to BEFORE `@api_router.get("/profile/{user_id}")` in /app/backend/server.py (so the static path is matched first). Re-run scenarios 1, 2, 3 — they will pass once the route is reachable.
               2) Optional — Consider sharpening the Maya directive to explicitly bind the "single missing field" rule to the field name (e.g. for blank location: "Ask ONLY 'Which city are you targeting?' — do not ask anything else."). And/or add a no-markdown-bold reinforcement so replies don't use **bold**.
               3) No backend code regressions found — auth/signup/login, PUT /profile/<id>, GET /profile/<id> directly, /chat personalisation, /jobs/match, and /payments/checkout all still work.
+        - working: true
+          agent: "testing"
+          comment: |
+            RE-RUN of scenarios 1, 2, 3, and 6 (per main agent request) after fixes:
+              (a) `@api_router.get("/profile/me")` moved BEFORE `@api_router.get("/profile/{user_id}")` (now at server.py line 362, dynamic route at line 385). A second duplicate of /profile/me still exists at line 494 — harmless because Starlette dispatches to the first registration, but main agent may want to delete the duplicate for cleanliness.
+              (b) Chat endpoint now prepends a "MISSING ONE FIELD" directive when exactly one critical field (target_role / location / remote) is blank in the profile (server.py lines 261-286).
+
+            Executed /app/profile_me_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **ALL 4 TARGETED SCENARIOS NOW PASS. Full 8/8 PASS (no regressions in 4/5/7/8).**
+
+            ✅ Scenario 1 — Signup fresh user (Priya Sharma + profileme_<ts>_<rand>@example.com + ValidPass123!) → 200 user_id=u_fb8e1230abcb4e. GET /api/profile/me with Bearer <valid> → 200 with body {"ok":true, "user":{"user_id":"u_fb8e1230abcb4e","email":"profileme_…@example.com","name":"Priya Sharma"}, "profile":{"user_id":"u_fb8e1230abcb4e","completed":false,"name":"Priya Sharma"}, "profile_completed":false}. The new static route now wins over the dynamic /{user_id} route. PASS
+            ✅ Scenario 2 — GET /api/profile/me (no Authorization header) → 401 {"detail":"not authenticated"}. GET /api/profile/me with Bearer "not_a_real_token" → 401 {"detail":"not authenticated"}. Both cases correctly hit the auth check inside get_profile_me. PASS
+            ✅ Scenario 3 — PUT /api/profile/u_fb8e1230abcb4e with full body (target_role="Senior Business Analyst", seniority="senior", years_experience=7, location="Bucharest", remote="hybrid", salary_min=4000, salary_max=6000, skills=["SQL","Python","analytics"], languages=["English","Romanian"], education="BSc Computer Science", experience_summary, industries=["fintech","retail"], strengths, weaknesses) → 200. Then GET /api/profile/me with Bearer → 200 with profile_completed=true and ALL saved fields echoed back exactly (target_role="Senior Business Analyst", location="Bucharest", remote="hybrid", salary_min=4000, salary_max=6000, skills={"SQL","Python","analytics"}, seniority="senior"). PASS
+            ✅ Scenario 6 — PUT location="" (single missing field). POST /api/chat avatar=maya empty message + fresh session_id. Reply (241 chars): "Hi Priya! I can see you're targeting Senior Business Analyst roles in fintech or retail with your strong SQL, Python, and analytics background — just need one quick detail: which city or country are you looking in, or are you open to remote?" Heuristics: bullet_lines=0, q_count=1, mentions_location=True ("which city or country are you looking in" → matches 'city' AND 'where' synonym), mentions_salary=False, asks_target_role=False, asks_skills=False. The new MISSING ONE FIELD directive successfully nudged Claude to ask for location (and only location) in a single short sentence. PASS
+
+            Regression checks (scenarios 4, 5, 7, 8) all PASS as before — full profile chat doesn't dump bullets, "start the search" acknowledges without re-asking, /jobs/match returns the saved profile fields with 5 matches, /payments/checkout guards guest user_id with 401 and accepts the authenticated user with 200.
+
+            FINAL: 8/8 PASS. The profile-aware chat context + GET /api/profile/me + jobs-use-logged-in-profile task is FULLY GREEN. Stuck count cleared.
 
             Required tests (against public ingress URL):
             (1) Signup a fresh user via POST /api/auth/signup → keep token. Call GET /api/profile/me with Bearer token → expect 200 with profile.completed=false (the seed row).

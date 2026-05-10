@@ -187,6 +187,47 @@ backend:
           comment: "All 7 scenarios (a)-(g) PASS via /app/backend_test.py against the public ingress URL. (a) seed returns ok=true, saved_jobs=3, purchases=2. (b) /api/saved-jobs returns the 3 expected demo rows ('Senior Product Designer' / 'Customer Success Manager' / 'Data Analyst') each with title, company, location and is_demo:true. (c) /api/purchases returns 2 rows w/ status='paid', currency='gbp', amounts [699, 899], avatars {sofia, maya}. (d) Idempotency: 2nd seed returns same counts and DB still holds 3 saved_jobs and 2 purchases (no duplication). (e) reset returns ok=true w/ purchases_removed=2 and saved_jobs_removed=3; subsequent GETs return 0 rows. (f) seed and reset both return HTTP 400 with detail='user_id required' when body is empty. (g) Isolation: after seeding demo_iso_A and inserting a manual non-demo 'My real job', /api/demo/reset removed only the 3 demo rows; the manually-saved 'My real job' remained intact. No issues found."
 
 frontend:
+  - task: "Multilingual chat language directive (PL/ES/PA/UR + EN/RO)"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: |
+            Backend already accepts `lang: Optional[str]` in ChatRequest and injects a per-language directive into the system prompt (server.py lines ~223-227). The frontend has been extended to support 4 NEW languages on top of EN/RO: Polish (Polish), Spanish (Spanish), Punjabi (Punjabi), Urdu (Urdu). The frontend sends `lang: langName` (English-language name) to /api/chat for every message.
+
+            Required tests (against public ingress URL):
+            (1) POST /api/chat with avatar=sofia, message="Hello, can you help me prepare for a frontend interview?", lang="Polish" — expect a response in Polish (must contain at least one Polish-specific character/word like ą/ę/ć/ł or common Polish words "tak"/"dziękuję"/"praca"/"masz"). Should NOT respond in English.
+            (2) POST /api/chat with avatar=maya, message="I'm looking for a senior product role.", lang="Spanish" — response must contain Spanish-specific markers (ñ, ¿/¡ punctuation, or words "trabajo"/"buscar"/"perfil"/"hola"). Should NOT be in English.
+            (3) POST /api/chat with avatar=aria, message="What should I learn next?", lang="Punjabi" — response must be in Punjabi (Gurmukhi script, e.g. characters like ਮ ਆ ਸ ਤ etc.). Should NOT be in English.
+            (4) POST /api/chat with avatar=sofia, message="I need to prepare for an interview.", lang="Urdu" — response must be in Urdu (Arabic script characters, e.g. ا ل م ن ت etc.). Should NOT be in English.
+            (5) Regression: POST /api/chat with lang="English" still works (returns English).
+            (6) Regression: POST /api/chat with lang="Romanian" still works (returns Romanian).
+            (7) /api/chat without `lang` defaults to English (graceful default).
+            (8) Multi-turn conversation in Polish: send 2 user messages back-to-back with the same session_id; both AI replies must remain in Polish.
+
+            ALL 8 SCENARIOS MUST PASS. The integration uses Claude (claude-sonnet-4-5) via the Emergent LLM key — Claude is multilingual and consistently honours the LANGUAGE directive injected in the system prompt.
+        - working: true
+          agent: "testing"
+          comment: |
+            Multilingual chat language directive — full 8-scenario suite executed via /app/backend_test.py against the public ingress URL (https://bilingual-ai-coach-1.preview.emergentagent.com/api/chat). 8/8 PASS. The LANGUAGE directive injected by server.py (lines ~223-227) is being honoured end-to-end by Claude sonnet-4-5 through the Emergent LLM key.
+
+            Detailed per-scenario results:
+            (1) POLISH (avatar=sofia, lang=Polish) → 200. Reply: "Cześć! Oczywiście pomogę Ci przygotować się do rozmowy na stanowisko frontend!..." — Polish chars found ['ą','ę','ż','ć','ś']; Polish words found ['nie','rozmow','twoj','masz','cześć','rozmowy','przygotować','mogę']. No English connectors. PASS
+            (2) SPANISH (avatar=maya, lang=Spanish) → 200. Reply: "¡Perfecto! Veo que buscas un rol de Senior Product Manager en Madrid, España..." — Spanish chars ['í','ñ','¿','¡']; Spanish words ['trabajo','senior']. PASS
+            (3) PUNJABI (avatar=aria, lang=Punjabi) → 200. Reply opens in Gurmukhi: "ਤੁਹਾਡੇ ਕੈਰੀਅਰ ਦੇ ਟੀਚੇ ਨੂੰ ਸਮਝਣ ਲਈ..." — Gurmukhi codepoints (U+0A00–U+0A7F) = 109 (> 5 required). PASS
+            (4) URDU (avatar=sofia, lang=Urdu) → 200. Reply opens in Urdu: "بہترین! میں آپ کی انٹرویو کی تیاری میں مدد کروں گی۔..." — Arabic-script codepoints (U+0600–U+06FF) = 160 (> 10 required). PASS
+            (5) ENGLISH REGRESSION (avatar=sofia, lang=English) → 200. Reply: "Hi! I'm Sofia, your AI Interview Coach..." — ascii_letter_ratio=1.00, no Polish/Spanish/Gurmukhi/Arabic chars. PASS
+            (6) ROMANIAN REGRESSION (avatar=maya, lang=Romanian) → 200. Reply: "Perfect! Văd că vrei un rol de Product Manager..." — RO chars ['Ș','î','ă','ț']; RO words ['pentru']. PASS
+            (7) DEFAULT (avatar=sofia, NO lang field) → 200. Reply: "Hi there! 👋 Welcome to revoloai. I'm Sofia, your AI Interview Coach..." — ascii_letter_ratio=1.00, no foreign markers. Default to English confirmed. PASS
+            (8) MULTI-TURN POLISH (lang=Polish, same session_id across 2 user messages, same user_id) → both turns 200. Turn 1 reply: "Cześć! Super, że chcesz się przygotować..." (PL markers present). Turn 2 reply with same session_id returned by turn 1: "Rozumiem, że chcesz poznać przykładowe pytania..." (PL markers ['ą','ł','ó','ę','ż','ć']; words ['nie','rozmow','twoj','rozmowy']). session_id persisted across both calls. PASS
+
+            FINAL: 8/8 PASSED, 0/8 FAILED. Multilingual directive is fully working for PL/ES/PA/UR + EN/RO + default. No issues found.
+
   - task: "EN + RO bilingual stability across all screens (UI, chat, interview, results, radar legends, pricing, legal pages)"
     implemented: true
     working: "NA"
@@ -227,12 +268,11 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 6
+  test_sequence: 7
   run_ui: false
 
 test_plan:
-  current_focus:
-    - "User signup/login + Profile CRUD + Personalisation injection (chat/interview)"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -258,3 +298,18 @@ agent_communication:
           • Scenario E (RO toggle): PASS — Înregistrare / Conectare / Creează cont rendered.
           • Scenario F (validation): PASS — both 400 (password < 6 chars) and 409 (duplicate email) errors render inline in the modal.
         ACTION FOR MAIN AGENT: please do NOT re-fix the duplicate-import — it has already been removed by testing. The auth/profile/chat flow is working in the UI."
+    - agent: "main"
+      message: |
+        New backend testing required: Multilingual chat language directive for 4 newly added languages — Polish (pl), Spanish (es), Punjabi (pa), Urdu (ur) — plus EN/RO regression. The frontend now supports 6 total languages and forwards `lang` (English-language name like "Polish"/"Urdu") to /api/chat for every user message. The backend personalisation builds a system prompt that includes a strict LANGUAGE directive. Please run the 8 scenarios listed in the task "Multilingual chat language directive (PL/ES/PA/UR + EN/RO)". Do NOT re-test other endpoints. Use any test user_id (no purchases required — basic tier is fine). The hostname for testing is the public ingress URL.
+    - agent: "testing"
+      message: |
+        Multilingual chat language directive suite executed via /app/backend_test.py against the public ingress URL — ALL 8/8 SCENARIOS PASS.
+          (1) Polish (sofia) — PL chars + words present, no English dominance. PASS
+          (2) Spanish (maya) — Spanish chars (í, ñ, ¿, ¡) + words (trabajo, senior). PASS
+          (3) Punjabi (aria) — 109 Gurmukhi codepoints (U+0A00–U+0A7F), threshold >5. PASS
+          (4) Urdu (sofia) — 160 Arabic-script codepoints (U+0600–U+06FF), threshold >10. PASS
+          (5) English regression (sofia, lang=English) — ascii_letter_ratio=1.00, no foreign markers. PASS
+          (6) Romanian regression (maya, lang=Romanian) — RO chars (Ș, î, ă, ț) + word 'pentru'. PASS
+          (7) Default no-lang field (sofia) — defaults to English, ascii_letter_ratio=1.00. PASS
+          (8) Multi-turn Polish (same session_id, same user_id, 2 messages) — both replies remain Polish, session_id persisted across both calls. PASS
+        The LANGUAGE directive injected by server.py is being honoured end-to-end by Claude sonnet-4-5 (via Emergent LLM key). No issues found, no fixes required.

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Avatar } from "../components/Avatar";
 import {
   AVATARS,
@@ -25,14 +26,23 @@ import {
   getOrCreateUserId,
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import {
+  speak,
+  stopSpeaking,
+  startListening,
+  voiceSupport,
+} from "../lib/voice";
 
 type Msg = { id: string; role: "user" | "ai"; content: string };
+
+const SPEAKER_PREF_KEY = "revolo.voice.speaker";
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ avatar?: string }>();
   const key = ((params.avatar as AvatarKey) || "sofia") as AvatarKey;
   const meta = AVATAR_META[key];
-  const { t, langName } = useI18n();
+  const { t, langName, lang } = useI18n();
+  const isRTL = lang === "ur";
   const aName = t(`avatars.${key}.name`);
   const aRole = t(`avatars.${key}.role`);
   const [input, setInput] = useState("");
@@ -42,8 +52,35 @@ export default function ChatScreen() {
   const [listening, setListening] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [matching, setMatching] = useState(false);
+  // Voice toggles & support flags
+  const [speakerOn, setSpeakerOn] = useState(false); // default OFF (per requirements)
+  const [vSupport] = useState(() => voiceSupport());
+  const lastInputViaMicRef = useRef<boolean>(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const typingDot = useRef(new Animated.Value(0)).current;
+
+  // Load speaker preference (per device)
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await AsyncStorage.getItem(SPEAKER_PREF_KEY);
+        if (v === "1") setSpeakerOn(true);
+      } catch {}
+    })();
+  }, []);
+
+  // Stop any speech when leaving screen, switching avatar, or changing language
+  useEffect(() => {
+    return () => {
+      stopSpeaking();
+      try { recRef.current?.stop(); } catch {}
+    };
+  }, []);
+  useEffect(() => {
+    // Stop speaking when language changes so we don't read stale text in wrong voice
+    stopSpeaking();
+  }, [lang]);
 
   // intro on mount
   useEffect(() => {
@@ -86,9 +123,11 @@ export default function ChatScreen() {
     }
   }, [sending, typingDot]);
 
-  const send = async (text: string) => {
+  const send = async (text: string, opts?: { fromMic?: boolean }) => {
     const txt = text.trim();
     if (!txt || sending) return;
+    // Stop any in-progress TTS before sending another message
+    stopSpeaking();
     const userMsg: Msg = { id: `u${Date.now()}`, role: "user", content: txt };
     const next = [...messages, userMsg];
     setMessages(next);
@@ -106,6 +145,13 @@ export default function ChatScreen() {
       setMessages((m) => [...m, ai]);
       setSuggestions(r.suggestions || []);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+      // Auto-speak reply ONLY when speaker is ON AND user input came from mic
+      const shouldSpeak = !!(opts?.fromMic) && speakerOn && vSupport.tts;
+      if (shouldSpeak && r.reply) {
+        try { speak(r.reply, lang); } catch {}
+      }
+      // reset mic flag after handling
+      lastInputViaMicRef.current = false;
     } catch {
       setMessages((m) => [
         ...m,
@@ -159,26 +205,80 @@ export default function ChatScreen() {
     }
   };
 
+  const toggleSpeaker = useCallback(async () => {
+    const next = !speakerOn;
+    setSpeakerOn(next);
+    try { await AsyncStorage.setItem(SPEAKER_PREF_KEY, next ? "1" : "0"); } catch {}
+    if (!next) stopSpeaking();
+    if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
+  }, [speakerOn]);
+
+  const stopMic = useCallback(() => {
+    try { recRef.current?.stop(); } catch {}
+    recRef.current = null;
+    setListening(false);
+  }, []);
+
   const onMic = async () => {
-    // Prepare voice interaction: ask for permission on native, simulate on web
+    // If already listening, treat tap as STOP
+    if (listening) { stopMic(); return; }
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    if (Platform.OS === "web") {
-      try {
-        const stream = await (navigator as any).mediaDevices?.getUserMedia?.({ audio: true });
-        if (stream) {
-          stream.getTracks().forEach((t: MediaStreamTrack) => t.stop());
-          setListening(true);
-          setTimeout(() => setListening(false), 1500);
-        } else {
-          Alert.alert(t("chat.micUnavailable"), t("chat.micUnavailableMsg"));
-        }
-      } catch {
-        Alert.alert(t("chat.micDenied"));
-      }
+
+    // Native (iOS/Android) fallback — informative alert; text input still works
+    if (Platform.OS !== "web") {
+      Alert.alert(t("chat.micUnavailable"), t("chat.micUnavailableMsg"));
       return;
     }
+
+    // Browser STT support check
+    if (!vSupport.stt) {
+      Alert.alert(t("chat.micUnavailable"), t("chat.micUnavailableMsg"));
+      return;
+    }
+
+    // Stop TTS first so it doesn't bleed into the mic
+    stopSpeaking();
+
+    // Request mic permission first (gives user-friendly error)
+    try {
+      const stream = await (navigator as any).mediaDevices?.getUserMedia?.({ audio: true });
+      // Immediately stop the test stream — SpeechRecognition opens its own
+      stream?.getTracks?.().forEach((tr: MediaStreamTrack) => tr.stop());
+    } catch {
+      Alert.alert(t("chat.micDenied"));
+      return;
+    }
+
+    let finalCaptured = "";
     setListening(true);
-    setTimeout(() => setListening(false), 1500);
+    const handle = startListening(lang, {
+      onResult: (text, isFinal) => {
+        // Live preview in the input field
+        setInput(text);
+        if (isFinal) finalCaptured = text;
+      },
+      onError: () => {
+        setListening(false);
+        recRef.current = null;
+      },
+      onEnd: () => {
+        setListening(false);
+        recRef.current = null;
+        const captured = (finalCaptured || "").trim();
+        if (captured) {
+          // Mark this as mic-originated and send
+          lastInputViaMicRef.current = true;
+          // Slight delay so UI shows captured text briefly
+          setTimeout(() => send(captured, { fromMic: true }), 60);
+        }
+      },
+    });
+    if (!handle) {
+      setListening(false);
+      Alert.alert(t("chat.micUnavailable"), t("chat.micUnavailableMsg"));
+      return;
+    }
+    recRef.current = handle;
   };
 
   return (
@@ -205,6 +305,19 @@ export default function ChatScreen() {
               <Text style={styles.statusText}>{listening ? t("chat.listening") : sending ? t("chat.typing") : aRole}</Text>
             </View>
           </View>
+          <Pressable
+            testID="chat-speaker-btn"
+            style={styles.headerBtn}
+            hitSlop={10}
+            onPress={toggleSpeaker}
+            accessibilityLabel={speakerOn ? t("chat.speakerOn") : t("chat.speakerOff")}
+          >
+            <Ionicons
+              name={speakerOn ? "volume-high" : "volume-mute"}
+              size={20}
+              color={speakerOn ? meta.color : "#5B6577"}
+            />
+          </Pressable>
           <Pressable testID="chat-info-btn" style={styles.headerBtn} hitSlop={10} onPress={() => Alert.alert(aName, `${aRole} — ${t("chat.info", { name: aName })}`)}>
             <Ionicons name="information-circle-outline" size={22} color="#5B6577" />
           </Pressable>
@@ -232,7 +345,12 @@ export default function ChatScreen() {
                     : styles.bubbleAi,
                 ]}
               >
-                <Text style={m.role === "user" ? styles.bubbleUserText : styles.bubbleAiText}>
+                <Text
+                  style={[
+                    m.role === "user" ? styles.bubbleUserText : styles.bubbleAiText,
+                    isRTL && { writingDirection: "rtl", textAlign: "right" },
+                  ]}
+                >
                   {m.content}
                 </Text>
               </View>
@@ -299,7 +417,7 @@ export default function ChatScreen() {
             </Pressable>
             <TextInput
               testID="chat-input"
-              style={styles.input}
+              style={[styles.input, isRTL && { textAlign: "right", writingDirection: "rtl" }]}
               placeholder={t("chat.placeholder", { name: aName })}
               placeholderTextColor="#8A93A6"
               value={input}

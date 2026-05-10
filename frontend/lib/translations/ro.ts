@@ -160,7 +160,6 @@ const ro: Translations = {
     saveSample: "Salvează un rol exemplu",
     signInTitle: "Conectare",
     signInSub: "Folosește orice nume — datele rămân pe acest dispozitiv.",
-    namePh: "Numele tău",
   },
   footer: {
     note:

@@ -160,7 +160,6 @@ const en: Translations = {
     saveSample: "Save a sample role",
     signInTitle: "Sign in",
     signInSub: "Use any name — your data stays on this device.",
-    namePh: "Your name",
   },
   footer: {
     note:

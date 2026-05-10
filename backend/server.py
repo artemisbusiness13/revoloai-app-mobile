@@ -852,22 +852,31 @@ async def health_integrations():
 # ---------------- Wire up app ----------------
 app.include_router(api_router)
 
+# ---------------- CORS ----------------
+# Reads `CORS_ORIGINS` from env (comma-separated). Falls back to a sensible
+# default list that already includes the production domain. The regex
+# additionally permits any *.revoloai.com, any *.netlify.app preview, any
+# *.preview.emergentagent.com dev preview, and any localhost:* port — so
+# Netlify deploy previews and the Emergent dev preview keep working.
+_DEFAULT_CORS = ",".join([
+    "https://revoloai.com",
+    "https://www.revoloai.com",
+    "http://localhost:3000",
+    "http://localhost:8081",
+    "http://localhost:19006",
+    "http://localhost:19000",
+])
+_cors_env = (os.environ.get("CORS_ORIGINS") or _DEFAULT_CORS).strip()
+CORS_ORIGINS = [o.strip() for o in _cors_env.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=[
-        "https://revoloai.com",
-        "https://www.revoloai.com",
-        "http://localhost:3000",
-        "http://localhost:8081",
-        "http://localhost:19006",
-        "http://localhost:19000",
-    ],
-    # Allow any subdomain of revoloai.com, any *.netlify.app preview, any
-    # *.preview.emergentagent.com dev preview, and any localhost:* port.
+    allow_origins=CORS_ORIGINS,
     allow_origin_regex=r"^(https?://localhost(:\d+)?|https://([a-z0-9-]+\.)?revoloai\.com|https://[a-z0-9-]+\.netlify\.app|https://[a-z0-9-]+\.preview\.emergentagent\.com|https://[a-z0-9-]+\.emergent\.host|https://[a-z0-9-]+\.emergentagent\.com)$",
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"],
+    expose_headers=["Content-Disposition"],
 )
 
 

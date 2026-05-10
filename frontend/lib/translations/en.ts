@@ -203,6 +203,8 @@ const en: Translations = {
     profileCoachSummary: "I have your profile saved. I'll coach based on: {summary}.",
     profileStartCoachQ: "What would you like to work on first?",
     profileSavedNoFields: "I have your profile saved. What would you like to work on?",
+    findJobsCta: "Find jobs",
+    findJobsPlanTitle: "Job Search — 3 matches",
   },
   checkout: {
     title: "Checkout",

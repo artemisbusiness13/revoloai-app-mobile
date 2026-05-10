@@ -141,6 +141,8 @@ const ur: Translations = {
     profileCoachSummary: "میرے پاس آپ کا پروفائل محفوظ ہے۔ میں اس بنیاد پر رہنمائی کروں گی: {summary}.",
     profileStartCoachQ: "آپ پہلے کس چیز پر کام کرنا چاہیں گے؟",
     profileSavedNoFields: "میرے پاس آپ کا پروفائل محفوظ ہے۔ آپ کس چیز پر کام کرنا چاہتے ہیں؟",
+    findJobsCta: "ملازمتیں تلاش کریں",
+    findJobsPlanTitle: "ملازمت کی تلاش — 3 مماثلتیں",
   },
   checkout: {
     title: "چیک آؤٹ", oneTime: "ایک بار",

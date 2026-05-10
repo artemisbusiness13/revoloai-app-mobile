@@ -141,6 +141,8 @@ const es: Translations = {
     profileCoachSummary: "Tengo tu perfil guardado. Te asesoraré según: {summary}.",
     profileStartCoachQ: "¿En qué te gustaría trabajar primero?",
     profileSavedNoFields: "Tengo tu perfil guardado. ¿En qué quieres trabajar?",
+    findJobsCta: "Buscar empleos",
+    findJobsPlanTitle: "Búsqueda de empleo — 3 ofertas",
   },
   checkout: {
     title: "Pago", oneTime: "Pago único",

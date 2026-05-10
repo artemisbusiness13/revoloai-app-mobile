@@ -13,7 +13,7 @@ import {
   Animated,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useLocalSearchParams, router } from "expo-router";
+import { Stack, useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -54,6 +54,7 @@ export default function ChatScreen() {
   const [listening, setListening] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [matching, setMatching] = useState(false);
+  const [mayaPaid, setMayaPaid] = useState<boolean>(false);
   // Voice toggles & support flags
   const [speakerOn, setSpeakerOn] = useState(false); // default OFF (per requirements)
   const [vSupport] = useState(() => voiceSupport());
@@ -163,6 +164,31 @@ export default function ChatScreen() {
     }
   }, [sending, typingDot]);
 
+  // Refresh Maya's paid status whenever the screen mounts or the user
+  // returns from a Stripe redirect. Used to decide what the "Find jobs"
+  // CTA button does: load matches (paid) or open checkout (unpaid).
+  const refreshPaidStatus = useCallback(async () => {
+    if (key !== "maya" || !user?.user_id) {
+      setMayaPaid(false);
+      return;
+    }
+    try {
+      const purchases = await api<any[]>(`/purchases?user_id=${user.user_id}`);
+      const paid = (purchases || []).some(
+        (p) => (p?.avatar === "maya" || (p?.item_id || "").startsWith("jobs-") || p?.item_id === "bundle-starter") && p?.status === "paid"
+      );
+      setMayaPaid(paid);
+    } catch {
+      setMayaPaid(false);
+    }
+  }, [key, user?.user_id]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshPaidStatus();
+    }, [refreshPaidStatus])
+  );
+
   const send = async (text: string, opts?: { fromMic?: boolean }) => {
     const txt = text.trim();
     if (!txt || sending) return;
@@ -221,6 +247,56 @@ export default function ChatScreen() {
       setMatching(false);
     }
   };
+
+  // Handle the in-chat "Find jobs" CTA button. If the user has already paid
+  // for Maya, we go straight to the jobs screen. Otherwise we route to the
+  // existing /checkout flow with the basic Job Search plan (jobs-3 / £3.99).
+  // The existing checkout screen handles login-required and Stripe redirect.
+  const onFindJobsCta = useCallback(async () => {
+    if (matching) return;
+    // Logged out: route to home with signin modal, same UX as /checkout guard
+    if (!user?.user_id) {
+      router.replace({ pathname: "/", params: { signin: "1" } });
+      return;
+    }
+    if (mayaPaid) {
+      await findJobs();
+      return;
+    }
+    // Not paid → open checkout with the basic Job Search plan.
+    router.push({
+      pathname: "/checkout",
+      params: {
+        avatar: "maya",
+        item_id: "jobs-3",
+        title: t("chat.findJobsPlanTitle"),
+        price: "£3.99",
+        kind: "service",
+      },
+    });
+  }, [matching, user?.user_id, mayaPaid, findJobs, t]);
+
+  // Detect if a given AI message contains a job-search CTA (the model said
+  // "press the find-jobs button" or similar). Multilingual.
+  const ctaRegex = React.useMemo(
+    () =>
+      /(\bfind\s+jobs?\b|\bstart\s+(the\s+)?(search|matching)\b|\bshow\s+(me\s+)?(the\s+)?matches\b|\brun\s+the\s+search\b|caut[ăa]\s+(joburi|locuri\s+de\s+munc[ăa])|porne(?:s|ș)te\s+c[ăa]utarea|incepe\s+c[ăa]utarea|znajdź\s+oferty|rozpocznij\s+wyszukiwanie|zacznij\s+szukać|buscar\s+empleos?|empezar\s+(la\s+)?búsqueda|comenzar\s+la\s+búsqueda|iniciar\s+búsqueda|ਨੌਕਰੀਆਂ\s+ਲੱਭੋ|ملازمت(?:یں)?\s+تلاش|تلاش\s+شروع)/i,
+    []
+  );
+
+  // Decide whether to render the inline "Find jobs" CTA button under the
+  // LAST Maya AI message that suggests starting the search. We render it
+  // only once (under the most-recent matching AI bubble) so the chat stays
+  // tidy when scrolling history.
+  const lastCtaIndex = React.useMemo(() => {
+    if (key !== "maya") return -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role !== "ai") continue;
+      if (ctaRegex.test(m.content)) return i;
+    }
+    return -1;
+  }, [key, messages, ctaRegex]);
 
   // Sofia-only: start a real adaptive interview
   const startInterview = async () => {
@@ -377,25 +453,55 @@ export default function ChatScreen() {
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
             showsVerticalScrollIndicator={false}
           >
-            {messages.map((m) => (
-              <View
-                key={m.id}
-                style={[
-                  styles.bubble,
-                  m.role === "user"
-                    ? [styles.bubbleUser, { backgroundColor: meta.color }]
-                    : styles.bubbleAi,
-                ]}
-              >
-                <Text
+            {messages.map((m, idx) => (
+              <React.Fragment key={m.id}>
+                <View
                   style={[
-                    m.role === "user" ? styles.bubbleUserText : styles.bubbleAiText,
-                    isRTL && { writingDirection: "rtl", textAlign: "right" },
+                    styles.bubble,
+                    m.role === "user"
+                      ? [styles.bubbleUser, { backgroundColor: meta.color }]
+                      : styles.bubbleAi,
                   ]}
                 >
-                  {m.content}
-                </Text>
-              </View>
+                  <Text
+                    style={[
+                      m.role === "user" ? styles.bubbleUserText : styles.bubbleAiText,
+                      isRTL && { writingDirection: "rtl", textAlign: "right" },
+                    ]}
+                  >
+                    {m.content}
+                  </Text>
+                </View>
+                {/* Inline "Find jobs" CTA — only under Maya AI messages that
+                   suggest starting the job search, rendered once (latest match). */}
+                {idx === lastCtaIndex && (
+                  <Pressable
+                    testID="chat-find-jobs-cta"
+                    onPress={onFindJobsCta}
+                    disabled={matching}
+                    style={({ pressed }) => [
+                      styles.ctaBtn,
+                      { backgroundColor: meta.color, opacity: pressed || matching ? 0.85 : 1 },
+                    ]}
+                    accessibilityRole="button"
+                    accessibilityLabel={t("chat.findJobsCta")}
+                  >
+                    {matching ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <>
+                        <Ionicons name="search" size={16} color="#fff" />
+                        <Text style={styles.ctaBtnText}>{t("chat.findJobsCta")}</Text>
+                        {!mayaPaid && user?.user_id ? (
+                          <View style={styles.ctaPriceTag}>
+                            <Text style={styles.ctaPriceTagText}>£3.99</Text>
+                          </View>
+                        ) : null}
+                      </>
+                    )}
+                  </Pressable>
+                )}
+              </React.Fragment>
             ))}
             {sending && messages.length > 0 && (
               <View style={[styles.bubble, styles.bubbleAi, { flexDirection: "row", alignItems: "center", gap: 6 }]}>
@@ -500,6 +606,30 @@ const styles = StyleSheet.create({
   bubbleUser: { alignSelf: "flex-end", borderBottomRightRadius: 4 },
   bubbleUserText: { fontSize: 14, color: "#fff", lineHeight: 20 },
   typingDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#8A93A6" },
+
+  // Inline "Find jobs" CTA shown under Maya AI messages that suggest starting
+  // the search. Sits below the bubble, full-width-ish but capped, primary tint.
+  ctaBtn: {
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    marginTop: 6,
+    marginBottom: 4,
+    minHeight: 40,
+  },
+  ctaBtnText: { color: "#fff", fontSize: 14, fontWeight: "700" },
+  ctaPriceTag: {
+    backgroundColor: "rgba(255,255,255,0.22)",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    marginLeft: 4,
+  },
+  ctaPriceTagText: { color: "#fff", fontSize: 12, fontWeight: "700" },
 
   suggRow: { paddingHorizontal: 14, paddingVertical: 8, gap: 8 },
   suggChip: {

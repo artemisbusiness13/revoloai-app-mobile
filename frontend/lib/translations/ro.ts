@@ -203,6 +203,8 @@ const ro: Translations = {
     profileCoachSummary: "Am profilul tău salvat. Voi îndruma pe baza: {summary}.",
     profileStartCoachQ: "La ce vrei să lucrăm mai întâi?",
     profileSavedNoFields: "Am profilul tău salvat. La ce vrei să lucrăm?",
+    findJobsCta: "Caută joburi",
+    findJobsPlanTitle: "Căutare joburi — 3 potriviri",
   },
   checkout: {
     title: "Plată",

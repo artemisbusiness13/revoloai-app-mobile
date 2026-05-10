@@ -142,6 +142,8 @@ const pl: Translations = {
     profileCoachSummary: "Mam zapisany Twój profil. Będę doradzać na podstawie: {summary}.",
     profileStartCoachQ: "Nad czym chciałbyś popracować najpierw?",
     profileSavedNoFields: "Mam zapisany Twój profil. Nad czym chcesz popracować?",
+    findJobsCta: "Znajdź oferty",
+    findJobsPlanTitle: "Wyszukiwanie pracy — 3 oferty",
   },
   checkout: {
     title: "Płatność", oneTime: "Jednorazowo",

@@ -141,6 +141,8 @@ const pa: Translations = {
     profileCoachSummary: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਮੈਂ ਇਸ ਅਨੁਸਾਰ ਮਾਰਗਦਰਸ਼ਨ ਕਰਾਂਗੀ: {summary}.",
     profileStartCoachQ: "ਤੁਸੀਂ ਪਹਿਲਾਂ ਕਿਸ ਉੱਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੋਗੇ?",
     profileSavedNoFields: "ਮੇਰੇ ਕੋਲ ਤੁਹਾਡਾ ਪ੍ਰੋਫਾਈਲ ਸੁਰੱਖਿਅਤ ਹੈ। ਤੁਸੀਂ ਕਿਸ ਉੱਤੇ ਕੰਮ ਕਰਨਾ ਚਾਹੁੰਦੇ ਹੋ?",
+    findJobsCta: "ਨੌਕਰੀਆਂ ਲੱਭੋ",
+    findJobsPlanTitle: "ਨੌਕਰੀ ਖੋਜ — 3 ਮੈਚ",
   },
   checkout: {
     title: "ਚੈੱਕਆਊਟ", oneTime: "ਇੱਕ ਵਾਰ",

@@ -492,39 +492,64 @@ export default function Home() {
     scrollRef.current?.scrollTo({ y: Math.max(servicesY.current[a] - 12, 0), animated: true });
   };
 
+  // Auth gate: signup → profile → service. Demo mode bypasses for testing.
+  const gateForService = (proceed: () => void) => {
+    // Demo mode is allowed (testing only)
+    if (isDemo) { proceed(); return; }
+    // Not logged in → push them through signup
+    if (!auth.user) {
+      setSignInMode("signup");
+      setSignInOpen(true);
+      return;
+    }
+    // Logged in but profile not completed → onboard them
+    if (!auth.profileCompleted) {
+      router.push("/profile");
+      return;
+    }
+    // All good
+    proceed();
+  };
+
   const openChat = (a: "maya" | "sofia" | "aria") => {
     setSelectedAvatar(a);
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push({ pathname: "/chat", params: { avatar: a } });
+    gateForService(() => {
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      router.push({ pathname: "/chat", params: { avatar: a } });
+    });
   };
 
   const openCheckout = (p: Plan) => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push({
-      pathname: "/checkout",
-      params: {
-        avatar: p.avatar,
-        item_id: p.id,
-        title: p.title,
-        price: p.price,
-        bullets: p.bullets.join("|"),
-        kind: "service",
-      },
+    gateForService(() => {
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      router.push({
+        pathname: "/checkout",
+        params: {
+          avatar: p.avatar,
+          item_id: p.id,
+          title: p.title,
+          price: p.price,
+          bullets: p.bullets.join("|"),
+          kind: "service",
+        },
+      });
     });
   };
 
   const openBundleCheckout = (b: typeof bundles[number]) => {
-    if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push({
-      pathname: "/checkout",
-      params: {
-        avatar: b.avatar,
-        item_id: b.id,
-        title: b.title,
-        price: b.price,
-        bullets: b.bullets.join("|"),
-        kind: "bundle",
-      },
+    gateForService(() => {
+      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      router.push({
+        pathname: "/checkout",
+        params: {
+          avatar: b.avatar,
+          item_id: b.id,
+          title: b.title,
+          price: b.price,
+          bullets: b.bullets.join("|"),
+          kind: "bundle",
+        },
+      });
     });
   };
 

@@ -16,8 +16,10 @@
   NODE_VERSION = "20"
   YARN_VERSION = "1.22.22"
   # Production backend URL — baked into the JS bundle at build time.
-  # Override via Netlify UI → Site settings → Environment variables if needed.
-  EXPO_PUBLIC_BACKEND_URL = "https://bilingual-ai-coach-1.preview.emergentagent.com"
+  # IMPORTANT: This value here will OVERRIDE any value set in Netlify UI's
+  # Environment Variables. To switch backend URL per environment (e.g. for
+  # branch deploys), keep this commented OUT and set the var in Netlify UI.
+  EXPO_PUBLIC_BACKEND_URL = "https://bilingual-ai-coach-1.emergent.host"
   # Force a clean Metro cache on every Netlify build so env var changes are picked up.
   EXPO_NO_CACHE = "1"
   CI = "true"

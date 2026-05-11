@@ -31,60 +31,102 @@ export default function JobsScreen() {
   const key = ((params.avatar as AvatarKey) || "maya") as AvatarKey;
   const meta = AVATAR_META[key];
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, ready: authReady } = useAuth();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [status, setStatus] = useState<SearchStatus>("idle");
+  // Monotonic request counter — used to ignore out-of-order responses from
+  // earlier load() invocations (race condition when auth.user_id resolves
+  // asynchronously and useFocusEffect re-fires).
+  const reqIdRef = React.useRef(0);
 
   const load = useCallback(async () => {
-    // Always clear stale state up front so the user never sees previous
-    // results (e.g. cached software jobs while delivery driver jobs load).
+    // Hold off until auth context has hydrated. Without this guard, the very
+    // first focus pass fires with user=null → guest user_id → backend has no
+    // profile → status="no_target_role" → those results race the real
+    // user.user_id call and can finish LAST, clobbering the real "ok" jobs.
+    if (!authReady) {
+      // eslint-disable-next-line no-console
+      console.log("[jobs] auth not ready yet — waiting");
+      return;
+    }
+    const myReq = ++reqIdRef.current;
     setLoading(true);
     setStatus("idle");
     setJobs([]);
     setProfile(null);
     const tStart = Date.now();
+    // eslint-disable-next-line no-console
+    console.log("[jobs] load() start req=", myReq, "user_id=", user?.user_id || "(none)");
+    let httpStatus = 0;
     try {
-      // Always prefer the authenticated user id so the search uses the saved
-      // profile (target_role, location, remote, salary, skills, ...).
       const uid = user?.user_id || (await getOrCreateUserId());
-      const r = await api<{ profile: any; matches: Job[]; status?: SearchStatus; live?: boolean; query?: string; where?: string; count?: number }>(
-        // Append a cache-busting token so any intermediate proxy / SW that
-        // might cache the response key on URL is bypassed.
-        `/jobs/match?_t=${Date.now()}`,
-        {
-          method: "POST",
-          // RequestInit `cache: "no-store"` defeats any browser HTTP-cache that
-          // might serve a previous identical POST response.
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Pragma": "no-cache",
-          },
-          body: JSON.stringify({ user_id: uid, limit: 10 }),
-        }
-      );
-      // Temporary diagnostic logs (per spec). Safe — no secrets.
+      const apiBase = (process.env.EXPO_PUBLIC_BACKEND_URL || "") + "/api";
+      // Raw fetch so we can log HTTP status separately from JSON-parse errors.
+      const fetchRes = await fetch(`${apiBase}/jobs/match?_t=${Date.now()}`, {
+        method: "POST",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
+        },
+        body: JSON.stringify({ user_id: uid, limit: 10 }),
+      });
+      httpStatus = fetchRes.status;
       // eslint-disable-next-line no-console
-      console.log("[jobs] response.status =", r.status, "live =", r.live, "count =", r.count, "query =", r.query, "where =", r.where);
+      console.log("[jobs] HTTP", httpStatus, "for req=", myReq);
+      if (!fetchRes.ok) {
+        const errBody = await fetchRes.text().catch(() => "");
+        // eslint-disable-next-line no-console
+        console.warn("[jobs] non-OK body:", errBody.slice(0, 200));
+        throw new Error(`HTTP ${httpStatus}`);
+      }
+      let r: any;
+      try {
+        r = await fetchRes.json();
+      } catch (jsonErr) {
+        // eslint-disable-next-line no-console
+        console.warn("[jobs] JSON parse failed:", (jsonErr as Error)?.message);
+        throw jsonErr;
+      }
+      // Drop the result if a newer load() has started in the meantime — this
+      // prevents an earlier "no_target_role"/"error" response from overwriting
+      // a later "ok" response (and vice-versa).
+      if (myReq !== reqIdRef.current) {
+        // eslint-disable-next-line no-console
+        console.log("[jobs] stale response (req=", myReq, "current=", reqIdRef.current, ") — ignored");
+        return;
+      }
       // eslint-disable-next-line no-console
-      console.log("[jobs] first title =", r.matches?.[0]?.title || "(none)", "| total matches =", (r.matches || []).length);
-      setJobs(r.matches || []);
-      setProfile(r.profile);
-      setStatus((r.status as SearchStatus) || "ok");
+      console.log("[jobs] response.status =", r?.status, "live =", r?.live, "count =", r?.count, "query =", r?.query, "where =", r?.where);
       // eslint-disable-next-line no-console
-      console.log(`[jobs] rendered ${(r.matches || []).length} job(s) in ${Date.now() - tStart}ms`);
+      console.log("[jobs] first title =", r?.matches?.[0]?.title || "(none)", "| total matches =", (r?.matches || []).length);
+      setJobs(r?.matches || []);
+      setProfile(r?.profile);
+      setStatus((r?.status as SearchStatus) || "ok");
+      // eslint-disable-next-line no-console
+      console.log(`[jobs] rendered ${(r?.matches || []).length} job(s) in ${Date.now() - tStart}ms (req=${myReq})`);
     } catch (e) {
+      // Same staleness guard for errors — don't show "error" if a newer
+      // request is still in flight (it may succeed).
+      if (myReq !== reqIdRef.current) {
+        // eslint-disable-next-line no-console
+        console.log("[jobs] stale error (req=", myReq, "current=", reqIdRef.current, ") — ignored");
+        return;
+      }
       // eslint-disable-next-line no-console
-      console.warn("[jobs] /jobs/match failed:", (e as Error)?.message);
+      console.warn("[jobs] /jobs/match failed (HTTP", httpStatus, "):", (e as Error)?.message);
       setJobs([]);
       setStatus("error");
     } finally {
-      setLoading(false);
+      if (myReq === reqIdRef.current) {
+        setLoading(false);
+      }
     }
-  }, [user?.user_id]);
+  }, [authReady, user?.user_id]);
 
   // Re-fetch on every screen focus so coming back from chat or checkout
   // always shows fresh, profile-bound results.

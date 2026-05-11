@@ -230,28 +230,51 @@ export default function ChatScreen() {
     }
   };
 
-  // Maya-only: find matched jobs (extracts profile from chat then ranks)
+  // Maya-only: find matched jobs. We no longer auto-extract a fresh profile
+  // from the chat transcript before searching — that was OVERWRITING the
+  // user's onboarding-saved target_role / location / salary with whatever
+  // Claude inferred from the chat (e.g. "Software Engineer" from a sample
+  // greeting), which then produced wrong Adzuna results. We now rely
+  // strictly on the saved profile.
   const findJobs = async () => {
     if (matching) return;
     setMatching(true);
     try {
-      const uid = user?.user_id || (await getOrCreateUserId());
-      if (sessionId) {
-        await api("/profile/extract", {
-          method: "POST",
-          body: JSON.stringify({ user_id: uid, session_id: sessionId }),
-        }).catch(() => {});
-      }
       router.push({ pathname: "/jobs", params: { avatar: key } });
     } finally {
       setMatching(false);
     }
   };
 
-  // Handle the in-chat "Find jobs" CTA button. If the user has already paid
-  // for Maya, we go straight to the jobs screen. Otherwise we route to the
-  // existing /checkout flow with the basic Job Search plan (jobs-3 / £3.99).
-  // The existing checkout screen handles login-required and Stripe redirect.
+  // Sofia-only: start a real adaptive interview. Same protection — only
+  // extract when the profile is INCOMPLETE so we never clobber user-saved
+  // onboarding values.
+  const startInterview = async () => {
+    if (matching) return;
+    setMatching(true);
+    try {
+      const uid = user?.user_id || (await getOrCreateUserId());
+      const prof = await api<any>(`/profile/${uid}`).catch(() => null);
+      // Only call extract when the profile has NEVER been completed (rare —
+      // typically signup → onboarding → profile.completed=true). overwrite=false
+      // is the new safe default but we double-gate here for clarity.
+      if (sessionId && !prof?.completed) {
+        await api("/profile/extract", {
+          method: "POST",
+          body: JSON.stringify({ user_id: uid, session_id: sessionId, overwrite: false }),
+        }).catch(() => {});
+      }
+      const role = prof?.target_role || "Generalist";
+      const seniority = prof?.seniority && prof.seniority !== "unknown" ? prof.seniority : "mid";
+      router.push({
+        pathname: "/interview",
+        params: { role, seniority, total: "5" },
+      });
+    } finally {
+      setMatching(false);
+    }
+  };
+
   const onFindJobsCta = useCallback(async () => {
     if (matching) return;
     // Logged out: route to home with signin modal, same UX as /checkout guard
@@ -297,31 +320,6 @@ export default function ChatScreen() {
     }
     return -1;
   }, [key, messages, ctaRegex]);
-
-  // Sofia-only: start a real adaptive interview
-  const startInterview = async () => {
-    if (matching) return;
-    setMatching(true);
-    try {
-      const uid = user?.user_id || (await getOrCreateUserId());
-      // Try to enrich from current chat first
-      if (sessionId) {
-        await api("/profile/extract", {
-          method: "POST",
-          body: JSON.stringify({ user_id: uid, session_id: sessionId }),
-        }).catch(() => {});
-      }
-      const prof = await api<any>(`/profile/${uid}`).catch(() => null);
-      const role = prof?.target_role || "Generalist";
-      const seniority = prof?.seniority && prof.seniority !== "unknown" ? prof.seniority : "mid";
-      router.push({
-        pathname: "/interview",
-        params: { role, seniority, total: "5" },
-      });
-    } finally {
-      setMatching(false);
-    }
-  };
 
   const toggleSpeaker = useCallback(async () => {
     const next = !speakerOn;

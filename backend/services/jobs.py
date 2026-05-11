@@ -156,28 +156,55 @@ def _normalise_adzuna_job(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _build_adzuna_what(profile: Dict[str, Any]) -> str:
+    """Build the Adzuna `what` keyword string STRICTLY from the saved
+    target_role. We do NOT fall back to skills/defaults — if the user's
+    target_role is empty we want the caller to surface a clear "no target role"
+    state to the UI rather than silently sending unrelated tech keywords.
+
+    Sanitisation rules (Adzuna expects keywords separated by spaces):
+        - Lowercase
+        - Replace `/`, `,`, `&`, `|`, `-`, `(`, `)`, `+` with a space
+        - Collapse multiple spaces
+        - Trim
+    """
+    raw = (profile.get("target_role") or "").strip()
+    if not raw:
+        return ""
+    import re as _re
+    cleaned = raw.lower()
+    cleaned = _re.sub(r"[\/,&|()+\-]", " ", cleaned)
+    cleaned = _re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned
+
+
 async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> Dict[str, Any]:
     """Live Adzuna search.
 
     Returns a dict with:
       - matches: list of normalised + scored jobs (empty when error/no results)
-      - status: "ok" | "no_results" | "error" | "not_configured"
+      - status: "ok" | "no_results" | "error" | "not_configured" | "no_target_role"
       - query / where: the values actually sent to the API (for logging only — no keys)
       - count: raw number of API hits before slicing/scoring
     """
     if not adzuna_enabled():
         return {"matches": [], "status": "not_configured", "query": "", "where": "", "count": 0}
     import httpx
-    what = (profile.get("target_role") or "").strip() or " ".join(
-        (profile.get("skills") or [])[:3]
-    ) or "any"
+    # STRICT: use only the saved target_role; no implicit skill/keyword fallback.
+    what = _build_adzuna_what(profile)
     where = (profile.get("location") or "").strip()
+    if not what:
+        logger.warning("Adzuna search skipped: target_role is empty (user_id=%r)", profile.get("user_id"))
+        return {"matches": [], "status": "no_target_role", "query": "", "where": where, "count": 0}
     salary_min = profile.get("salary_min") or None
     params = {
         "app_id": ADZUNA_APP_ID,
         "app_key": ADZUNA_APP_KEY,
         "results_per_page": max(1, min(int(limit), 50)),
-        "what": what,
+        # `what_or` matches jobs containing ANY of the keywords — much friendlier
+        # for multi-word roles like "delivery driver / courier" where AND-
+        # matching all of them would return 0 hits.
+        "what_or": what,
         "content-type": "application/json",
     }
     if where:
@@ -201,8 +228,8 @@ async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> Dict[str, A
 
     raw_jobs = data.get("results") or []
     logger.info(
-        "Adzuna search OK what=%r where=%r country=%s results=%d",
-        what, where, ADZUNA_COUNTRY, len(raw_jobs),
+        "Adzuna search OK what=%r where=%r country=%s results=%d (target_role=%r)",
+        what, where, ADZUNA_COUNTRY, len(raw_jobs), profile.get("target_role"),
     )
     scored: List[Dict[str, Any]] = []
     for raw in raw_jobs:

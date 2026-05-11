@@ -24,7 +24,7 @@ type Job = {
   source?: string;
 };
 
-type SearchStatus = "idle" | "ok" | "no_results" | "error" | "demo" | "not_configured";
+type SearchStatus = "idle" | "ok" | "no_results" | "error" | "demo" | "not_configured" | "no_target_role";
 
 export default function JobsScreen() {
   const params = useLocalSearchParams<{ avatar?: string }>();
@@ -121,6 +121,16 @@ export default function JobsScreen() {
                 <Pressable onPress={load} style={[s.retryBtn, { backgroundColor: meta.color }]}>
                   <Ionicons name="refresh" size={14} color="#fff" />
                   <Text style={s.retryText}>{t("common.retry")}</Text>
+                </Pressable>
+              </View>
+            ) : jobs.length === 0 && status === "no_target_role" ? (
+              <View style={s.stateBox}>
+                <Ionicons name="briefcase-outline" size={28} color="#5B6577" />
+                <Text style={s.stateTitle}>{t("jobs.noTargetTitle")}</Text>
+                <Text style={s.stateBody}>{t("jobs.noTargetBody")}</Text>
+                <Pressable onPress={() => router.push("/profile")} style={[s.retryBtn, { backgroundColor: meta.color }]}>
+                  <Ionicons name="person-circle-outline" size={14} color="#fff" />
+                  <Text style={s.retryText}>{t("jobs.openProfile")}</Text>
                 </Pressable>
               </View>
             ) : jobs.length === 0 && (status === "no_results" || status === "not_configured") ? (

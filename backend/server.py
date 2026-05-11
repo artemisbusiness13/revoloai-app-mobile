@@ -333,8 +333,15 @@ async def get_chat_session(session_id: str):
 # ---------------- Profile (extract via GPT, persist) ----------------
 @api_router.post("/profile/extract")
 async def extract_profile_from_session(payload: Dict[str, Any]):
-    """payload: {session_id} OR {transcript: str}, plus user_id"""
+    """payload: {session_id} OR {transcript: str}, plus user_id
+    Optional: {overwrite: bool} — defaults to FALSE. When False, this is
+    strictly non-destructive: only fields that are currently BLANK in the
+    existing profile are filled in. The user's hand-saved onboarding values
+    (target_role, location, salary, skills, etc.) are NEVER overwritten by
+    Claude's chat-derived guesses.
+    """
     user_id = payload.get("user_id") or "guest"
+    overwrite = bool(payload.get("overwrite", False))
     transcript = payload.get("transcript")
     session_id = payload.get("session_id")
     if session_id and not transcript:
@@ -352,9 +359,34 @@ async def extract_profile_from_session(payload: Dict[str, Any]):
     )
     if "error" in extracted:
         return extracted
+
+    # Non-destructive merge: only fill blanks unless overwrite=True.
+    existing = await db.profiles.find_one({"user_id": user_id}, {"_id": 0}) or {}
+    if not overwrite:
+        def _is_blank(v):
+            if v is None:
+                return True
+            if isinstance(v, str) and not v.strip():
+                return True
+            if isinstance(v, str) and v.strip().lower() in ("unknown", "any", "n/a"):
+                return True
+            if isinstance(v, list) and len(v) == 0:
+                return True
+            if isinstance(v, (int, float)) and v == 0:
+                return True
+            return False
+        # Protect onboarding-complete profiles entirely: if the user explicitly
+        # finished the onboarding form, treat their saved fields as authoritative.
+        if existing.get("completed") is True:
+            # Only add brand-new fields the user never had (very conservative).
+            extracted = {k: v for k, v in extracted.items() if k not in existing}
+        else:
+            extracted = {k: v for k, v in extracted.items() if _is_blank(existing.get(k))}
+
     extracted["user_id"] = user_id
     extracted["updated_at"] = now_utc()
-    await db.profiles.update_one({"user_id": user_id}, {"$set": extracted}, upsert=True)
+    if extracted:
+        await db.profiles.update_one({"user_id": user_id}, {"$set": extracted}, upsert=True)
     extracted.pop("updated_at", None)
     return extracted
 

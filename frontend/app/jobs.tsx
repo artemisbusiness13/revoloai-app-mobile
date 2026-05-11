@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,7 +8,23 @@ import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
 
-type Job = { id: string; title: string; company: string; location: string; remote: string; seniority: string; salary_min: number; salary_max: number; skills: string[]; match_score: number };
+type Job = {
+  id: string;
+  title: string;
+  company: string;
+  location: string;
+  remote: string;
+  seniority: string;
+  salary_min: number | null;
+  salary_max: number | null;
+  skills: string[];
+  match_score: number;
+  url?: string;
+  contract_time?: string;
+  source?: string;
+};
+
+type SearchStatus = "idle" | "ok" | "no_results" | "error" | "demo" | "not_configured";
 
 export default function JobsScreen() {
   const params = useLocalSearchParams<{ avatar?: string }>();
@@ -20,19 +36,28 @@ export default function JobsScreen() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<any>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [status, setStatus] = useState<SearchStatus>("idle");
 
   const load = async () => {
     setLoading(true);
+    setStatus("idle");
     try {
       // Always prefer the authenticated user id so the search uses the saved
       // profile (target_role, location, remote, salary, skills, ...).
       const uid = user?.user_id || (await getOrCreateUserId());
-      const r = await api<{ profile: any; matches: Job[] }>("/jobs/match", {
-        method: "POST",
-        body: JSON.stringify({ user_id: uid, limit: 10 }),
-      });
+      const r = await api<{ profile: any; matches: Job[]; status?: SearchStatus; live?: boolean }>(
+        "/jobs/match",
+        {
+          method: "POST",
+          body: JSON.stringify({ user_id: uid, limit: 10 }),
+        }
+      );
       setJobs(r.matches || []);
       setProfile(r.profile);
+      setStatus((r.status as SearchStatus) || "ok");
+    } catch (e) {
+      setJobs([]);
+      setStatus("error");
     } finally {
       setLoading(false);
     }
@@ -51,6 +76,14 @@ export default function JobsScreen() {
     } finally {
       setSavingId(null);
     }
+  };
+
+  const openApply = async (j: Job) => {
+    if (!j.url) {
+      router.push({ pathname: "/chat", params: { avatar: "aria" } });
+      return;
+    }
+    try { await Linking.openURL(j.url); } catch {}
   };
 
   return (
@@ -80,8 +113,22 @@ export default function JobsScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
-            {jobs.length === 0 ? (
-              <Text style={s.empty}>{t("jobs.noMatches")}</Text>
+            {jobs.length === 0 && status === "error" ? (
+              <View style={s.stateBox}>
+                <Ionicons name="cloud-offline-outline" size={28} color="#5B6577" />
+                <Text style={s.stateTitle}>{t("jobs.errorTitle")}</Text>
+                <Text style={s.stateBody}>{t("jobs.errorBody")}</Text>
+                <Pressable onPress={load} style={[s.retryBtn, { backgroundColor: meta.color }]}>
+                  <Ionicons name="refresh" size={14} color="#fff" />
+                  <Text style={s.retryText}>{t("common.retry")}</Text>
+                </Pressable>
+              </View>
+            ) : jobs.length === 0 && (status === "no_results" || status === "not_configured") ? (
+              <View style={s.stateBox}>
+                <Ionicons name="search-outline" size={28} color="#5B6577" />
+                <Text style={s.stateTitle}>{t("jobs.noResultsTitle")}</Text>
+                <Text style={s.stateBody}>{t("jobs.noResultsBody")}</Text>
+              </View>
             ) : null}
             {jobs.map((j) => (
               <View key={j.id} testID={`job-${j.id}`} style={s.card}>
@@ -91,21 +138,35 @@ export default function JobsScreen() {
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <Text style={s.title}>{j.title}</Text>
-                    <Text style={s.sub}>{j.company} · {j.location}</Text>
+                    <Text style={s.sub}>{[j.company, j.location].filter(Boolean).join(" · ")}</Text>
                   </View>
                 </View>
                 <View style={s.metaRow}>
-                  <Tag icon="briefcase-outline" text={j.seniority} />
-                  <Tag icon="globe-outline" text={j.remote} />
-                  <Tag icon="cash-outline" text={`£${Math.round(j.salary_min/1000)}–${Math.round(j.salary_max/1000)}k`} />
+                  {j.seniority ? <Tag icon="briefcase-outline" text={j.seniority} /> : null}
+                  {j.remote ? <Tag icon="globe-outline" text={j.remote} /> : null}
+                  {j.contract_time ? <Tag icon="time-outline" text={j.contract_time} /> : null}
+                  {(j.salary_min || j.salary_max) ? (
+                    <Tag
+                      icon="cash-outline"
+                      text={
+                        j.salary_min && j.salary_max
+                          ? `£${Math.round(j.salary_min/1000)}–${Math.round(j.salary_max/1000)}k`
+                          : j.salary_min
+                          ? `£${Math.round(j.salary_min/1000)}k+`
+                          : `up to £${Math.round((j.salary_max as number)/1000)}k`
+                      }
+                    />
+                  ) : null}
                 </View>
-                <View style={s.skillsRow}>
-                  {j.skills.slice(0, 4).map((sk) => (
-                    <View key={sk} style={s.skillChip}>
-                      <Text style={s.skillText}>{sk}</Text>
-                    </View>
-                  ))}
-                </View>
+                {j.skills && j.skills.length ? (
+                  <View style={s.skillsRow}>
+                    {j.skills.slice(0, 4).map((sk) => (
+                      <View key={sk} style={s.skillChip}>
+                        <Text style={s.skillText}>{sk}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: "row", gap: 8, marginTop: 12 }}>
                   <Pressable
                     testID={`job-save-${j.id}`}
@@ -122,9 +183,15 @@ export default function JobsScreen() {
                       </>
                     )}
                   </Pressable>
-                  <Pressable testID={`job-apply-${j.id}`} onPress={() => router.push({ pathname: "/chat", params: { avatar: "aria" } })} style={[s.btn, { backgroundColor: meta.color, flex: 1 }]}>
-                    <Text style={[s.btnText, { color: "#fff" }]}>{t("jobs.getPrep")}</Text>
-                    <Ionicons name="arrow-forward" size={14} color="#fff" />
+                  <Pressable
+                    testID={`job-apply-${j.id}`}
+                    onPress={() => openApply(j)}
+                    style={[s.btn, { backgroundColor: meta.color, flex: 1 }]}
+                  >
+                    <Text style={[s.btnText, { color: "#fff" }]}>
+                      {j.url ? t("jobs.apply") : t("jobs.getPrep")}
+                    </Text>
+                    <Ionicons name={j.url ? "open-outline" : "arrow-forward"} size={14} color="#fff" />
                   </Pressable>
                 </View>
               </View>
@@ -164,6 +231,11 @@ const s = StyleSheet.create({
   hTitle: { fontSize: 15, fontWeight: "800", color: "#0B0F19" },
   hSub: { fontSize: 12, color: "#5B6577", marginTop: 2 },
   empty: { textAlign: "center", color: "#5B6577", marginTop: 40 },
+  stateBox: { alignItems: "center", gap: 8, marginTop: 40, paddingHorizontal: 24 },
+  stateTitle: { fontSize: 15, fontWeight: "800", color: "#0B0F19", marginTop: 4, textAlign: "center" },
+  stateBody: { fontSize: 13, color: "#5B6577", textAlign: "center", lineHeight: 19 },
+  retryBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, marginTop: 8 },
+  retryText: { color: "#fff", fontSize: 13, fontWeight: "700" },
   card: { backgroundColor: "#fff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#ECEEF3" },
   scoreCircle: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   scoreText: { fontSize: 14, fontWeight: "800" },

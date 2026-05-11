@@ -162,6 +162,11 @@ const pa: Translations = {
     title: "ਮੇਲ ਖਾਂਦੀਆਂ ਨੌਕਰੀਆਂ", forRole: "{role} ਲਈ",
     topPicks: "ਤੁਹਾਡੇ ਲਈ ਟੌਪ ਚੋਣਾਂ",
     searching: "Maya ਖੋਜ ਰਹੀ ਹੈ…", noMatches: "ਅਜੇ ਕੋਈ ਮੇਲ ਨਹੀਂ। Maya ਨੂੰ ਆਪਣੀ ਚਾਹਤ ਬਾਰੇ ਹੋਰ ਦੱਸੋ।",
+    noResultsTitle: "ਅਜੇ ਕੋਈ ਮੇਲ ਖਾਂਦੀ ਨੌਕਰੀ ਨਹੀਂ ਮਿਲੀ",
+    noResultsBody: "ਆਪਣੀ ਲੋਕੇਸ਼ਨ, ਤਨਖਾਹ ਜਾਂ ਰੋਲ ਨੂੰ ਚੌੜਾ ਕਰੋ।",
+    errorTitle: "ਅਸਲੀ ਨੌਕਰੀਆਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ",
+    errorBody: "ਅਸੀਂ ਅਸਲੀ ਨੌਕਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+    apply: "ਅਰਜ਼ੀ ਦਿਓ",
     save: "ਸੇਵ ਕਰੋ", getPrep: "ਤਿਆਰੀ ਪਾਓ",
   },
   interview: {

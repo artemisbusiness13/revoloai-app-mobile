@@ -502,8 +502,18 @@ async def get_account_tier(user_id: str, avatar: str = "sofia"):
 @api_router.post("/jobs/match")
 async def match_jobs(req: JobMatchRequest):
     profile = await db.profiles.find_one({"user_id": req.user_id}, {"_id": 0}) or {}
-    matches = await jobs_svc.search(profile, limit=req.limit)
-    return {"profile": profile, "matches": matches, "live": jobs_svc.adzuna_enabled()}
+    result = await jobs_svc.search(profile, limit=req.limit)
+    # Backwards-compatible: surface matches at the top level so older clients
+    # keep working, plus the new fields (`status`, `query`, `where`, `count`).
+    return {
+        "profile": profile,
+        "matches": result.get("matches", []),
+        "status": result.get("status", "ok"),
+        "query": result.get("query", ""),
+        "where": result.get("where", ""),
+        "count": result.get("count", 0),
+        "live": jobs_svc.adzuna_enabled(),
+    }
 
 
 # ---------------- Interview (Sofia adaptive) ----------------

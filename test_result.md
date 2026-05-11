@@ -322,10 +322,73 @@ metadata:
   run_ui: false
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "POST /api/jobs/match new response shape (status/query/where/count + contract_time + no demo fallback when Adzuna configured)"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
+
+backend_jobs_match_v2:
+  - task: "POST /api/jobs/match new response shape (status/query/where/count + contract_time + no demo fallback when Adzuna configured)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py, /app/backend/services/jobs.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "testing"
+          comment: |
+            CRITICAL ENVIRONMENT DISCREPANCY — Adzuna keys are NOT configured in this dev environment, but the review request stated they ARE. Cannot empirically validate the live-API behavior in this env.
+
+            Evidence (verified):
+              • /app/backend/.env: `ADZUNA_APP_ID=` and `ADZUNA_APP_KEY=` — BOTH EMPTY.
+              • GET /api/health/integrations → `adzuna_keys_present: false`, `adzuna_live_enabled: false`, `adzuna_country: "gb"`.
+              • Backend process env (verified via /proc) contains no ADZUNA values.
+              • Consequently jobs_svc.adzuna_enabled() returns False, so services/jobs.search() takes the dev-fallback branch and returns `status="demo"` with the curated pool — exactly as designed in /app/backend/services/jobs.py line 209-214.
+
+            STRUCTURAL VALIDATION (what we CAN verify without live keys) — executed via /app/jobs_match_test.py against https://bilingual-ai-coach-1.preview.emergentagent.com/api. **13/13 structural assertions PASS.**
+
+            (1) Signup fresh user (Priya Sharma + jobsmatch_<ts>_<rand>@example.com + ValidPass123!) → 200 user_id=u_e248f3b024624c. PUT /api/profile/<uid> with realistic body {target_role:"Software Engineer", location:"London", remote:"hybrid", salary_min:50000, salary_max:80000, skills:["Python","React","AWS"], seniority:"senior"} → 200. ✓
+            (2) POST /api/jobs/match {user_id, limit:5} → 200. Response top-level keys: ['count','live','matches','profile','query','status','where']. All 7 keys present including the NEW fields (status, query, where, count). Existing fields (profile, matches, live) still present — REGRESSION SAFE for old clients. ✓
+                • status=="demo" (because adzuna_enabled()==false), live==false, query=="", where=="", count==5, len(matches)==5 — this is the DEV FALLBACK branch of services/jobs.search().
+            (3) Broken-profile scenario (target_role="zzzzzzzzzzzz unlikely role yz123", location="Mars", skills=[]) → 200. New fields still present. Returned status="demo" (dev fallback always returns curated pool); when Adzuna IS configured this would return status="no_results" / matches=[] / count=0 per code at line 190-191.
+            (4) Safe-logging check skipped — both ADZUNA values are EMPTY strings so there's nothing to grep for. Code inspection of /app/backend/services/jobs.py confirms: line 173-176 (warning) and 180-183 (info) ONLY log %r of `what`, `where`, `ADZUNA_COUNTRY` and either result count or exception class name. Neither ADZUNA_APP_ID nor ADZUNA_APP_KEY are ever passed to the logger. The auth params are sent via `params` dict to httpx and never log-formatted. ✓
+
+            CODE-LEVEL VALIDATION (services/jobs.py — confirmed against spec):
+              ✅ `search(profile, limit)` returns dict {matches, status, query, where, count} (lines 195-214).
+              ✅ When adzuna_enabled() is True the curated demo pool is NEVER returned — `search_adzuna` is called directly (line 210). Demo pool only when keys missing (lines 212-214) and returns status="demo".
+              ✅ status values: "ok" / "no_results" / "error" / "demo" (and "not_configured" returned from search_adzuna at line 146 if it's ever called without keys — defensive).
+              ✅ _normalise_adzuna_job now returns `contract_time` (lines 118 + 130) and `url` (line 129 via redirect_url). source="adzuna" (line 132).
+              ✅ Endpoint /api/jobs/match (server.py 502-516) wires status/query/where/count to the top level alongside profile/matches/live.
+
+            WHAT I CANNOT VALIDATE WITHOUT LIVE KEYS (still PENDING):
+              (a) response.live === true when keys ARE set
+              (b) response.status === "ok" with a positive count and Adzuna-sourced titles
+              (c) match.url and match.contract_time populated with real Adzuna values + match.source === "adzuna"
+              (d) That NO match titles collide with old demo titles (Principal Engineer / Lead Marketing Strategist / Product Designer)
+              (e) Broken-profile path actually returning status="no_results" / matches=[] / count=0 from a real Adzuna 0-hit response
+              (f) Empirical grep for the exact ADZUNA_APP_ID + ADZUNA_APP_KEY values in /var/log/supervisor/backend.*.log
+
+            ACTION REQUIRED:
+              1) Set real ADZUNA_APP_ID and ADZUNA_APP_KEY in /app/backend/.env and `sudo supervisorctl restart backend`. Confirm via GET /api/health/integrations → `adzuna_live_enabled: true`.
+              2) Re-run /app/jobs_match_test.py — once Adzuna is enabled the test automatically switches to the live-mode assertion set (lines 87-120 of the script) and will validate (a)-(d) above. It will also grep the backend logs for the exact key values (lines 165-178).
+              3) Until then this task remains `working: "NA"` / `needs_retesting: true`. The current dev-fallback behavior is correct per the code; no code changes are needed.
+
+agent_communication:
+    - agent: "testing"
+      message: |
+        Re-tested /api/jobs/match against the new response shape (review request). **Structural / regression checks ALL PASS (13/13)** — the new fields (status, query, where, count) are present alongside the legacy profile, matches, live; older clients reading only `matches` and `profile` continue to work.
+
+        ❗ Cannot empirically test the live Adzuna behavior the review asked for because **ADZUNA_APP_ID and ADZUNA_APP_KEY are EMPTY in /app/backend/.env** in this environment (confirmed via direct file read and via GET /api/health/integrations which returns `adzuna_keys_present:false`, `adzuna_live_enabled:false`). The review request stated keys ARE set, but they are not. The system is correctly returning `status="demo"` + curated pool via the dev-fallback branch of services/jobs.search() — that branch is unreachable in production where the keys would be set.
+
+        Code-level inspection of /app/backend/services/jobs.py confirms the spec is implemented correctly:
+          • search() returns the new dict shape and dispatches to search_adzuna when adzuna_enabled() is true (NEVER falls back to the demo pool when keys are configured).
+          • _normalise_adzuna_job returns contract_time (line 118+130) and url (line 129).
+          • Logging at line 173-183 only logs what/where/country/error-type — keys are never passed to the logger.
+
+        ACTION FOR MAIN AGENT: To complete the validation requested, populate ADZUNA_APP_ID + ADZUNA_APP_KEY in /app/backend/.env, restart backend, and re-call the testing agent — the existing /app/jobs_match_test.py auto-switches to the live-assertion set and will verify (live===true, status==="ok", positive count, match.url/contract_time/source==="adzuna", no demo-title collisions, and grep the logs for the exact key values).
 
 backend_new2:
   - task: "Profile-aware chat context + GET /api/profile/me + jobs use logged-in profile"

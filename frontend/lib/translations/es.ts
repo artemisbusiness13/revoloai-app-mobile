@@ -162,6 +162,11 @@ const es: Translations = {
     title: "Empleos coincidentes", forRole: "para {role}",
     topPicks: "Mejores opciones para ti",
     searching: "Maya está buscando…", noMatches: "Sin coincidencias aún. Cuéntale más a Maya sobre lo que buscas.",
+    noResultsTitle: "Aún no hay empleos coincidentes",
+    noResultsBody: "Prueba a ampliar la ubicación, el salario o el puesto.",
+    errorTitle: "No se pudieron cargar empleos reales",
+    errorBody: "No pudimos cargar empleos reales ahora. Inténtalo de nuevo.",
+    apply: "Aplicar",
     save: "Guardar", getPrep: "Preparar",
   },
   interview: {

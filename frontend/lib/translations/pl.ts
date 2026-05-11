@@ -163,6 +163,11 @@ const pl: Translations = {
     title: "Dopasowane oferty", forRole: "dla {role}",
     topPicks: "Najlepsze propozycje dla Ciebie",
     searching: "Maya szuka…", noMatches: "Brak dopasowań. Powiedz Maye więcej o tym, czego szukasz.",
+    noResultsTitle: "Nie znaleziono pasujących ofert",
+    noResultsBody: "Spróbuj rozszerzyć lokalizację, wynagrodzenie lub stanowisko.",
+    errorTitle: "Nie udało się załadować ofert",
+    errorBody: "Nie udało nam się załadować prawdziwych ofert. Spróbuj ponownie.",
+    apply: "Aplikuj",
     save: "Zapisz", getPrep: "Przygotuj się",
   },
   interview: {

@@ -115,6 +115,7 @@ def _normalise_adzuna_job(raw: Dict[str, Any]) -> Dict[str, Any]:
     title = raw.get("title") or ""
     company = (raw.get("company") or {}).get("display_name") or ""
     loc = (raw.get("location") or {}).get("display_name") or ""
+    contract_time = raw.get("contract_time") or raw.get("contract_type") or ""
     return {
         "id": str(raw.get("id") or uuid.uuid4()),
         "title": title,
@@ -126,15 +127,23 @@ def _normalise_adzuna_job(raw: Dict[str, Any]) -> Dict[str, Any]:
         "salary_max": int(raw["salary_max"]) if raw.get("salary_max") else None,
         "skills": [],  # Adzuna doesn't return structured skills
         "url": raw.get("redirect_url") or "",
+        "contract_time": contract_time,
         "description": (raw.get("description") or "")[:400],
         "source": "adzuna",
     }
 
 
-async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
-    """Live Adzuna search. Returns [] on error so caller can fall back."""
+async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> Dict[str, Any]:
+    """Live Adzuna search.
+
+    Returns a dict with:
+      - matches: list of normalised + scored jobs (empty when error/no results)
+      - status: "ok" | "no_results" | "error" | "not_configured"
+      - query / where: the values actually sent to the API (for logging only — no keys)
+      - count: raw number of API hits before slicing/scoring
+    """
     if not adzuna_enabled():
-        return []
+        return {"matches": [], "status": "not_configured", "query": "", "where": "", "count": 0}
     import httpx
     what = (profile.get("target_role") or "").strip() or " ".join(
         (profile.get("skills") or [])[:3]
@@ -160,24 +169,46 @@ async def search_adzuna(profile: Dict[str, Any], limit: int = 10) -> List[Dict[s
             r.raise_for_status()
             data = r.json()
     except Exception as e:
-        logger.exception("Adzuna search failed: %s", e)
-        return []
+        # Safe log — no keys, just what + where + error type.
+        logger.warning(
+            "Adzuna search FAILED what=%r where=%r country=%s err=%s",
+            what, where, ADZUNA_COUNTRY, type(e).__name__,
+        )
+        return {"matches": [], "status": "error", "query": what, "where": where, "count": 0}
 
     raw_jobs = data.get("results") or []
+    logger.info(
+        "Adzuna search OK what=%r where=%r country=%s results=%d",
+        what, where, ADZUNA_COUNTRY, len(raw_jobs),
+    )
     scored: List[Dict[str, Any]] = []
     for raw in raw_jobs:
         job = _normalise_adzuna_job(raw)
         job["match_score"] = _heuristic_score(profile, job)
         scored.append(job)
     scored.sort(key=lambda j: j["match_score"], reverse=True)
-    return scored[:limit]
+    if not scored:
+        return {"matches": [], "status": "no_results", "query": what, "where": where, "count": 0}
+    return {"matches": scored[:limit], "status": "ok", "query": what, "where": where, "count": len(raw_jobs)}
 
 
-async def search(profile: Dict[str, Any], limit: int = 10) -> List[Dict[str, Any]]:
-    """Unified entrypoint: live Adzuna when configured, else curated pool."""
+async def search(profile: Dict[str, Any], limit: int = 10) -> Dict[str, Any]:
+    """Unified entrypoint.
+
+    When Adzuna is configured we ALWAYS use it — we never silently fall back
+    to the curated demo pool. The caller (the /jobs/match endpoint) receives
+    a structured `status` it can surface to the UI:
+        - "ok"            → real matches in `matches`
+        - "no_results"    → API returned 0 hits, show "no matches" copy
+        - "error"         → network/API error, show retry copy
+        - "demo"          → Adzuna is NOT configured (dev only); curated pool returned
+
+    The frontend uses these to render the correct empty / error state without
+    ever mixing demo jobs into a "live" response.
+    """
     if adzuna_enabled():
-        live = await search_adzuna(profile, limit=limit)
-        if live:
-            return live
-        logger.info("Adzuna returned no/error results, falling back to curated pool.")
-    return await search_pool(profile, limit=limit)
+        return await search_adzuna(profile, limit=limit)
+    # Dev fallback only — never reached in prod where the keys are set.
+    pool = await search_pool(profile, limit=limit)
+    logger.info("Adzuna NOT configured — returning curated demo pool of %d jobs (dev only)", len(pool))
+    return {"matches": pool, "status": "demo", "query": "", "where": "", "count": len(pool)}

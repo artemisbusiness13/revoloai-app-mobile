@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, router, useLocalSearchParams } from "expo-router";
+import { Stack, router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/api";
@@ -38,32 +38,61 @@ export default function JobsScreen() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [status, setStatus] = useState<SearchStatus>("idle");
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    // Always clear stale state up front so the user never sees previous
+    // results (e.g. cached software jobs while delivery driver jobs load).
     setLoading(true);
     setStatus("idle");
+    setJobs([]);
+    setProfile(null);
+    const tStart = Date.now();
     try {
       // Always prefer the authenticated user id so the search uses the saved
       // profile (target_role, location, remote, salary, skills, ...).
       const uid = user?.user_id || (await getOrCreateUserId());
-      const r = await api<{ profile: any; matches: Job[]; status?: SearchStatus; live?: boolean }>(
-        "/jobs/match",
+      const r = await api<{ profile: any; matches: Job[]; status?: SearchStatus; live?: boolean; query?: string; where?: string; count?: number }>(
+        // Append a cache-busting token so any intermediate proxy / SW that
+        // might cache the response key on URL is bypassed.
+        `/jobs/match?_t=${Date.now()}`,
         {
           method: "POST",
+          // RequestInit `cache: "no-store"` defeats any browser HTTP-cache that
+          // might serve a previous identical POST response.
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+          },
           body: JSON.stringify({ user_id: uid, limit: 10 }),
         }
       );
+      // Temporary diagnostic logs (per spec). Safe — no secrets.
+      // eslint-disable-next-line no-console
+      console.log("[jobs] response.status =", r.status, "live =", r.live, "count =", r.count, "query =", r.query, "where =", r.where);
+      // eslint-disable-next-line no-console
+      console.log("[jobs] first title =", r.matches?.[0]?.title || "(none)", "| total matches =", (r.matches || []).length);
       setJobs(r.matches || []);
       setProfile(r.profile);
       setStatus((r.status as SearchStatus) || "ok");
+      // eslint-disable-next-line no-console
+      console.log(`[jobs] rendered ${(r.matches || []).length} job(s) in ${Date.now() - tStart}ms`);
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[jobs] /jobs/match failed:", (e as Error)?.message);
       setJobs([]);
       setStatus("error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.user_id]);
 
-  useEffect(() => { load(); }, [user?.user_id]);
+  // Re-fetch on every screen focus so coming back from chat or checkout
+  // always shows fresh, profile-bound results.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [load])
+  );
 
   const save = async (j: Job) => {
     setSavingId(j.id);
@@ -113,6 +142,15 @@ export default function JobsScreen() {
           </View>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
+            {/* Demo-mode banner — shows when the backend is NOT configured for
+               live Adzuna in this environment so the user knows the cards are
+               curated samples, not real jobs. */}
+            {status === "demo" ? (
+              <View style={s.demoBanner}>
+                <Ionicons name="alert-circle-outline" size={14} color="#9A6B00" />
+                <Text style={s.demoBannerText}>{t("jobs.demoBanner")}</Text>
+              </View>
+            ) : null}
             {jobs.length === 0 && status === "error" ? (
               <View style={s.stateBox}>
                 <Ionicons name="cloud-offline-outline" size={28} color="#5B6577" />
@@ -246,6 +284,19 @@ const s = StyleSheet.create({
   stateBody: { fontSize: 13, color: "#5B6577", textAlign: "center", lineHeight: 19 },
   retryBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, marginTop: 8 },
   retryText: { color: "#fff", fontSize: 13, fontWeight: "700" },
+  demoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#FFF7E0",
+    borderColor: "#F2DE9C",
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  demoBannerText: { color: "#9A6B00", fontSize: 12, fontWeight: "600", flexShrink: 1 },
   card: { backgroundColor: "#fff", borderRadius: 18, padding: 16, borderWidth: 1, borderColor: "#ECEEF3" },
   scoreCircle: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
   scoreText: { fontSize: 14, fontWeight: "800" },

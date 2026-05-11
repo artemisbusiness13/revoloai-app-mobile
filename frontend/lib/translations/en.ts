@@ -240,6 +240,7 @@ const en: Translations = {
     noTargetBody: "We need your target role to search. Open your profile and tell us what you're looking for.",
     openProfile: "Open profile",
     apply: "Apply",
+    demoBanner: "Demo mode — showing sample jobs (live search keys not configured here).",
     save: "Save",
     getPrep: "Get prep",
   },

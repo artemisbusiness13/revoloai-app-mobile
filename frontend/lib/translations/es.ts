@@ -170,6 +170,7 @@ const es: Translations = {
     noTargetBody: "Necesitamos tu puesto objetivo para buscar. Abre el perfil y dinos qué buscas.",
     openProfile: "Abrir perfil",
     apply: "Aplicar",
+    demoBanner: "Modo demo — mostrando empleos de muestra (las claves API en vivo no están configuradas aquí).",
     save: "Guardar", getPrep: "Preparar",
   },
   interview: {

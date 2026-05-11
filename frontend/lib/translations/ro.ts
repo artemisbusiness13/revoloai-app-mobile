@@ -240,6 +240,7 @@ const ro: Translations = {
     noTargetBody: "Avem nevoie de rolul tău țintă pentru a căuta. Deschide profilul și spune-ne ce cauți.",
     openProfile: "Deschide profilul",
     apply: "Aplică",
+    demoBanner: "Mod demo — afișăm exemple (cheile API live nu sunt configurate aici).",
     save: "Salvează",
     getPrep: "Pregătire",
   },

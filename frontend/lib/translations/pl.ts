@@ -171,6 +171,7 @@ const pl: Translations = {
     noTargetBody: "Potrzebujemy Twojego stanowiska, aby wyszukać. Otwórz profil i powiedz nam, czego szukasz.",
     openProfile: "Otwórz profil",
     apply: "Aplikuj",
+    demoBanner: "Tryb demo — pokazujemy przykładowe oferty (klucze API live nie są tu skonfigurowane).",
     save: "Zapisz", getPrep: "Przygotuj się",
   },
   interview: {

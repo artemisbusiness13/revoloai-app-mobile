@@ -4,7 +4,7 @@
    - Network-first for /api/* (always try the live backend; fallback to a JSON error if offline).
    - Cache-first for static assets (JS, CSS, images, fonts) with background revalidation.
 */
-const CACHE_VERSION = "revoloai-v1";
+const CACHE_VERSION = "revoloai-v2";
 const APP_SHELL = [
   "/",
   "/manifest.json",

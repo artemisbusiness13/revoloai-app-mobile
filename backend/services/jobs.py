@@ -15,6 +15,29 @@ ADZUNA_APP_ID = os.getenv("ADZUNA_APP_ID", "").strip()
 ADZUNA_APP_KEY = os.getenv("ADZUNA_APP_KEY", "").strip()
 ADZUNA_COUNTRY = os.getenv("ADZUNA_COUNTRY", "gb").strip().lower() or "gb"
 
+# Safe runtime banner so we can verify the BACKEND process actually reads the
+# Adzuna env vars (vs them being unset, or set-but-empty, or only present in
+# the shell). NEVER prints the secret values — only presence + length.
+# We use print() because uvicorn's logger config may not be installed yet at
+# import-time; print() bypasses that and lands in supervisor's stdout log.
+print(
+    f"[jobs] ADZUNA env at runtime → "
+    f"APP_ID exists={bool(ADZUNA_APP_ID)} (len={len(ADZUNA_APP_ID)}) | "
+    f"APP_KEY exists={bool(ADZUNA_APP_KEY)} (len={len(ADZUNA_APP_KEY)}) | "
+    f"COUNTRY={ADZUNA_COUNTRY!r} | "
+    f"enabled={bool(ADZUNA_APP_ID and ADZUNA_APP_KEY)}",
+    flush=True,
+)
+logger.info(
+    "[jobs] ADZUNA env at runtime → APP_ID exists=%s (len=%d) | APP_KEY exists=%s (len=%d) | COUNTRY=%s | enabled=%s",
+    bool(ADZUNA_APP_ID),
+    len(ADZUNA_APP_ID),
+    bool(ADZUNA_APP_KEY),
+    len(ADZUNA_APP_KEY),
+    ADZUNA_COUNTRY,
+    bool(ADZUNA_APP_ID and ADZUNA_APP_KEY),
+)
+
 
 def adzuna_enabled() -> bool:
     return bool(ADZUNA_APP_ID and ADZUNA_APP_KEY)

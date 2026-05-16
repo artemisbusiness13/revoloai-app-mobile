@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View, NativeSyntheticEvent, NativeScrollEvent, Platform } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View, Image, NativeSyntheticEvent, NativeScrollEvent, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useC, useTheme } from "./ThemeProvider";
 import { Button } from "./Button";
@@ -198,12 +198,12 @@ export function TermsAcceptanceGate(props: TermsAcceptanceGateProps = {}) {
           flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10,
           ...shadow(1, resolved === "dark"),
         }}>
-          <View style={{
-            width: 36, height: 36, borderRadius: 10, backgroundColor: C.primary,
-            alignItems: "center", justifyContent: "center",
-          }}>
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>r</Text>
-          </View>
+          <Image
+            source={require("../../assets/images/revoloai-icon.png")}
+            style={{ width: 36, height: 36, borderRadius: 10 }}
+            accessibilityLabel="RevoloAI logo"
+            resizeMode="contain"
+          />
           <View style={{ flex: 1 }}>
             <Text
               numberOfLines={1}

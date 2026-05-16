@@ -25,6 +25,12 @@ export default function Root({ children }: PropsWithChildren) {
         <meta name="theme-color" content="#5B5FE9" />
         <meta name="background-color" content="#FAFAFB" />
 
+        {/* Favicon — explicit links so all browsers pick up the RevoloAI mark */}
+        <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png?v=2" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png?v=2" />
+        <link rel="icon" type="image/x-icon" href="/favicon.ico?v=2" />
+        <link rel="shortcut icon" href="/favicon.ico?v=2" />
+
         {/* Apple Web App */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />

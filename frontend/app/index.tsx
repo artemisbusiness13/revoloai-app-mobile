@@ -720,15 +720,12 @@ export default function Home() {
         {/* Top Bar */}
         <View style={styles.topBar}>
           <View style={[styles.brandRow, { flex: 1 }]}>
-            <View style={styles.logoMark}>
-              <LinearGradient
-                colors={["#5B5FE9", "#8B5CF6"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
-              <Text style={styles.logoLetter}>r</Text>
-            </View>
+            <RNImage
+              source={require("../assets/images/revoloai-icon.png")}
+              style={styles.logoMark}
+              accessibilityLabel="RevoloAI logo"
+              resizeMode="contain"
+            />
             <Text style={[styles.brandText, { color: C.text }]}>revolo<Text style={{ color: C.primary }}>ai</Text></Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>

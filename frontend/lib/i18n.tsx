@@ -51,7 +51,41 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const v = await AsyncStorage.getItem(STORAGE_KEY);
-        if (v && v in DICTS) setLangState(v as LangCode);
+        if (v && v in DICTS) {
+          setLangState(v as LangCode);
+        } else {
+          // First visit — auto-detect from browser/device locale (best-effort).
+          // Maps the BCP-47 primary subtag to one of our 6 supported codes.
+          let detected: LangCode | null = null;
+          try {
+            if (Platform.OS === "web" && typeof navigator !== "undefined") {
+              const langs: string[] = (navigator.languages && navigator.languages.length
+                ? navigator.languages
+                : [navigator.language || "en"]) as string[];
+              const map: Record<string, LangCode> = {
+                en: "en", ro: "ro", pl: "pl", es: "es",
+                pa: "pa", ur: "ur",
+                // Common aliases / regional variants
+                "es-mx": "es", "es-ar": "es", "es-es": "es",
+                "en-gb": "en", "en-us": "en",
+                "pa-in": "pa", "pa-pk": "pa",
+                "ur-pk": "ur", "ur-in": "ur",
+              };
+              for (const l of langs) {
+                const lower = String(l || "").toLowerCase();
+                if (map[lower]) { detected = map[lower]; break; }
+                const primary = lower.split("-")[0];
+                if (map[primary]) { detected = map[primary]; break; }
+              }
+            }
+          } catch {}
+          if (detected) {
+            setLangState(detected);
+            // Persist so subsequent loads don't re-detect (user may have
+            // a different browser/OS lang than what they prefer in-app).
+            try { await AsyncStorage.setItem(STORAGE_KEY, detected); } catch {}
+          }
+        }
       } catch {}
       setReady(true);
     })();

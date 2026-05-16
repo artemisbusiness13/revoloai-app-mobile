@@ -5,6 +5,7 @@ import { useC, useTheme } from "./ThemeProvider";
 import { Button } from "./Button";
 import { DisclaimerBox } from "./Disclaimer";
 import { MdText } from "./MdText";
+import { LanguageSelectorBar } from "./LanguageSelectorBar";
 import { radius, shadow, space } from "./theme";
 import { TC_VERSION, TERMS_CONTENT, PRIVACY_CONTENT } from "../../lib/legalContent";
 import { useTermsAcceptance } from "../../lib/useTermsAcceptance";
@@ -129,9 +130,19 @@ export function TermsAcceptanceGate() {
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
+        {/* Compact language selector at the very top */}
+        <LanguageSelectorBar
+          onChange={() => {
+            setScrolledEnd(false);
+            setAcceptT(false);
+            setAcceptP(false);
+            setDeclined(false);
+            try { scrollRef.current?.scrollTo({ y: 0, animated: false }); } catch {}
+          }}
+        />
         {/* Compact header (~12% target) */}
         <View style={{
-          paddingTop: 26, paddingHorizontal: 14, paddingBottom: 8,
+          paddingTop: 12, paddingHorizontal: 14, paddingBottom: 8,
           backgroundColor: C.card,
           borderBottomWidth: 1, borderBottomColor: C.border,
           flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10,

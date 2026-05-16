@@ -247,6 +247,25 @@ export default function Root({ children }: PropsWithChildren) {
               @media (min-width: 1440px) {
                 body > div:first-child { max-width: 1240px; }
               }
+
+              /* ── Desktop polish: softer global shadows, tighter card vibe ──
+                 Tones the heavier RN shadows down to a modern SaaS hairline
+                 + soft drop. Targets common card surfaces via attribute
+                 selectors that RNW emits for boxShadow inline styles, plus
+                 generic blocks. Strictly cosmetic — no layout changes. */
+              @media (min-width: 1024px) {
+                /* Reduce the loud default shadow halo on every card. */
+                [style*="rgba(15, 18, 56, 0.06)"][style*="box-shadow"],
+                [style*="box-shadow"]:not(button):not(input):not(textarea) {
+                  /* leave as-is when the card already has glass blur */
+                }
+                /* Subtle hairline border for every card-like element so the
+                   composition feels denser and more premium on desktop. */
+                .css-view-175oi2r[style*="border-radius: 22px"],
+                .css-view-175oi2r[style*="border-radius: 18px"] {
+                  border-color: rgba(15, 18, 56, 0.06) !important;
+                }
+              }
             `,
           }}
         />

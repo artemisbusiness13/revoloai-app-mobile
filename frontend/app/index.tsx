@@ -9,6 +9,7 @@ import {
   Animated,
   Platform,
   Dimensions,
+  useWindowDimensions,
   TextInput,
   Alert,
   Linking,
@@ -326,6 +327,255 @@ function TrustCard({
   );
 }
 
+/* ---------- Desktop Hero Right Visual ---------- */
+/* Lightweight glass/SaaS composition for desktop only. Uses existing brand
+ * avatars + tokens. No animations, no images outside our own. Rendered only
+ * when the viewport is ≥ 1024px wide; mobile layout is untouched. */
+function HeroRightVisual({
+  C,
+  t,
+}: {
+  C: ReturnType<typeof useC>;
+  t: (k: string) => string;
+}) {
+  return (
+    <View style={hr.wrap} pointerEvents="none">
+      {/* Soft branded glow background */}
+      <View style={[hr.glowA, { backgroundColor: C.primary }]} />
+      <View style={[hr.glowB, { backgroundColor: C.sofia }]} />
+      <View style={[hr.glowC, { backgroundColor: C.maya }]} />
+
+      {/* Avatar trio card — top */}
+      <View style={[hr.card, hr.avatarsCard]}>
+        <View style={hr.avatarsRow}>
+          <View style={[hr.ringSm, { borderColor: C.maya, marginLeft: 0, zIndex: 3 }]}>
+            <Avatar uri={AVATARS.maya} size={42} />
+          </View>
+          <View style={[hr.ringSm, { borderColor: C.sofia, marginLeft: -14, zIndex: 2 }]}>
+            <Avatar uri={AVATARS.sofia} size={42} />
+          </View>
+          <View style={[hr.ringSm, { borderColor: C.aria, marginLeft: -14, zIndex: 1 }]}>
+            <Avatar uri={AVATARS.aria} size={42} />
+          </View>
+        </View>
+        <View style={{ marginLeft: 12, flex: 1 }}>
+          <Text style={[hr.cardTitle, { color: C.text }]}>{t("home.startWithAvatar")}</Text>
+          <View style={hr.statusRow}>
+            <View style={[hr.dot, { backgroundColor: C.emerald }]} />
+            <Text style={[hr.cardSub, { color: C.text2 }]}>{t("home.tapToExplore")}</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Chat preview card — middle */}
+      <View style={[hr.card, hr.chatCard]}>
+        <View style={hr.chatHeader}>
+          <View style={[hr.ringXs, { borderColor: C.sofia }]}>
+            <Avatar uri={AVATARS.sofia} size={28} />
+          </View>
+          <View style={{ flex: 1, marginLeft: 8 }}>
+            <Text style={[hr.chatName, { color: C.text }]}>Sofia</Text>
+            <Text style={[hr.chatRole, { color: C.text2 }]}>AI · Interview coach</Text>
+          </View>
+          <View style={[hr.livePill, { backgroundColor: C.emerald + "22" }]}>
+            <View style={[hr.dot, { backgroundColor: C.emerald }]} />
+            <Text style={[hr.liveText, { color: C.emerald }]}>Live</Text>
+          </View>
+        </View>
+        <View style={[hr.bubble, { backgroundColor: C.sofiaSoft || "#FCE7F3" }]}>
+          <Text style={[hr.bubbleText, { color: C.text }]} numberOfLines={2}>
+            Let’s sharpen your STAR answers — pick a role and we’ll start.
+          </Text>
+        </View>
+        <View style={[hr.bubble, hr.bubbleMe, { backgroundColor: C.primarySoft || "#E0E7FF" }]}>
+          <Text style={[hr.bubbleText, { color: C.text }]} numberOfLines={1}>
+            Frontend engineer · mid-level
+          </Text>
+        </View>
+      </View>
+
+      {/* Job match card — bottom-left */}
+      <View style={[hr.card, hr.jobCard]}>
+        <View style={hr.jobHeader}>
+          <View style={[hr.iconBox, { backgroundColor: C.mayaSoft || "#FEE2E2" }]}>
+            <Ionicons name="briefcase" size={14} color={C.maya} />
+          </View>
+          <Text style={[hr.jobTitle, { color: C.text }]} numberOfLines={1}>Senior Product Designer</Text>
+        </View>
+        <Text style={[hr.jobMeta, { color: C.text2 }]} numberOfLines={1}>Stripe · London · £85k</Text>
+        <View style={hr.matchRow}>
+          <View style={hr.matchBarTrack}>
+            <View style={[hr.matchBarFill, { width: "92%", backgroundColor: C.maya }]} />
+          </View>
+          <Text style={[hr.matchText, { color: C.maya }]}>92%</Text>
+        </View>
+      </View>
+
+      {/* Score card — bottom-right */}
+      <View style={[hr.card, hr.scoreCard]}>
+        <Text style={[hr.scoreLabel, { color: C.text2 }]}>Interview score</Text>
+        <Text style={[hr.scoreVal, { color: C.text }]}>8.6</Text>
+        <View style={hr.scoreLegend}>
+          <View style={[hr.legendDot, { backgroundColor: C.sofia }]} />
+          <Text style={[hr.legendText, { color: C.text2 }]}>Communication</Text>
+        </View>
+        <View style={hr.scoreLegend}>
+          <View style={[hr.legendDot, { backgroundColor: C.primary }]} />
+          <Text style={[hr.legendText, { color: C.text2 }]}>Technical</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+const hr = StyleSheet.create({
+  wrap: {
+    flex: 1,
+    minHeight: 480,
+    position: "relative",
+    marginLeft: 24,
+  },
+  glowA: {
+    position: "absolute",
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    top: -40,
+    right: -40,
+    opacity: 0.18,
+    filter: "blur(60px)" as any,
+  },
+  glowB: {
+    position: "absolute",
+    width: 220,
+    height: 220,
+    borderRadius: 110,
+    bottom: 20,
+    left: -30,
+    opacity: 0.16,
+    filter: "blur(60px)" as any,
+  },
+  glowC: {
+    position: "absolute",
+    width: 180,
+    height: 180,
+    borderRadius: 90,
+    top: 160,
+    right: 80,
+    opacity: 0.12,
+    filter: "blur(50px)" as any,
+  },
+  card: {
+    position: "absolute",
+    backgroundColor: "rgba(255,255,255,0.78)",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "rgba(15,18,56,0.06)",
+    padding: 14,
+    ...(Platform.OS === "web"
+      ? {
+          backdropFilter: "blur(14px) saturate(160%)",
+          WebkitBackdropFilter: "blur(14px) saturate(160%)",
+          boxShadow:
+            "0 10px 30px -10px rgba(15,18,56,0.18), 0 2px 6px -2px rgba(15,18,56,0.08)",
+        }
+      : {}),
+  },
+  avatarsCard: {
+    top: 12,
+    left: 24,
+    right: 32,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  avatarsRow: { flexDirection: "row", alignItems: "center" },
+  ringSm: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2.5,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  ringXs: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    overflow: "hidden",
+    backgroundColor: "#fff",
+  },
+  cardTitle: { fontSize: 14, fontWeight: "800", letterSpacing: -0.2 },
+  cardSub: { fontSize: 12, fontWeight: "500" },
+  statusRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 3 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+
+  chatCard: {
+    top: 110,
+    right: 0,
+    width: 260,
+  },
+  chatHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10 },
+  chatName: { fontSize: 13, fontWeight: "800" },
+  chatRole: { fontSize: 11, fontWeight: "500", marginTop: 1 },
+  livePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  liveText: { fontSize: 10, fontWeight: "700" },
+  bubble: {
+    alignSelf: "flex-start",
+    maxWidth: "92%",
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  bubbleMe: { alignSelf: "flex-end" },
+  bubbleText: { fontSize: 12, lineHeight: 16, fontWeight: "500" },
+
+  jobCard: {
+    bottom: 24,
+    left: 8,
+    width: 240,
+  },
+  jobHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  iconBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  jobTitle: { flex: 1, fontSize: 13, fontWeight: "800", letterSpacing: -0.2 },
+  jobMeta: { fontSize: 11, fontWeight: "500", marginBottom: 10 },
+  matchRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  matchBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(15,18,56,0.08)",
+    overflow: "hidden",
+  },
+  matchBarFill: { height: "100%", borderRadius: 3 },
+  matchText: { fontSize: 12, fontWeight: "800" },
+
+  scoreCard: {
+    bottom: 24,
+    right: 16,
+    width: 150,
+  },
+  scoreLabel: { fontSize: 10, fontWeight: "700", letterSpacing: 0.4, textTransform: "uppercase" },
+  scoreVal: { fontSize: 28, fontWeight: "800", letterSpacing: -1, marginTop: 2, marginBottom: 8 },
+  scoreLegend: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, fontWeight: "600" },
+});
+
 /* ---------- MAIN ---------- */
 export default function Home() {
   const insets = useSafeAreaInsets();
@@ -340,6 +590,11 @@ export default function Home() {
   const { resolved: themeMode } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<"maya" | "sofia" | "aria">("sofia");
+  /* Track viewport width for desktop-only enhancements. Mobile (<1024px)
+   * keeps its original single-column layout — only web ≥1024 gets the
+   * SaaS-style two-column hero + the right-side visual composition. */
+  const { width: winW } = useWindowDimensions();
+  const isDesktop = Platform.OS === "web" && winW >= 1024;
 
   // Built-in supported languages — extend SUPPORTED_LANGS to add more
   const langs = SUPPORTED_LANGS;
@@ -746,7 +1001,7 @@ export default function Home() {
           decelerationRate="normal"
         >
           {/* HERO */}
-          <View style={styles.heroWrap}>
+          <View style={[styles.heroWrap, isDesktop && styles.heroWrapDesktop]}>
             <LinearGradient
               colors={["#EEEFFE", "#FDECF5", "#FFFFFF"]}
               locations={[0, 0.55, 1]}
@@ -754,50 +1009,57 @@ export default function Home() {
               end={{ x: 1, y: 1 }}
               style={styles.heroBg}
             />
-            <View style={styles.earlyAccessPill}>
-              <View style={[styles.pulseDot]} />
-              <Text style={styles.earlyAccessText}>{t("home.earlyAccess")}</Text>
-            </View>
+            <View style={isDesktop ? styles.heroRow : undefined}>
+              <View style={isDesktop ? styles.heroLeft : undefined}>
+                <View style={styles.earlyAccessPill}>
+                  <View style={[styles.pulseDot]} />
+                  <Text style={styles.earlyAccessText}>{t("home.earlyAccess")}</Text>
+                </View>
 
-            <Text style={styles.heroTitle}>
-              {t("home.heroTitle1")}{"\n"}
-              <Text style={{ color: C.primary }}>{t("home.heroTitle2")}</Text>
-              {"\n"}{t("home.heroTitle3")}
-            </Text>
-            <Text style={styles.heroSub}>
-              {t("home.heroSub")}
-            </Text>
+                <Text style={styles.heroTitle}>
+                  {t("home.heroTitle1")}{"\n"}
+                  <Text style={{ color: C.primary }}>{t("home.heroTitle2")}</Text>
+                  {"\n"}{t("home.heroTitle3")}
+                </Text>
+                <Text style={styles.heroSub}>
+                  {t("home.heroSub")}
+                </Text>
 
-            {/* Hero avatars row */}
-            <View style={styles.heroAvatars}>
-              <View style={[styles.heroAvatarWrap, { borderColor: C.maya, zIndex: 3, marginLeft: 0 }]}>
-                <Avatar uri={AVATARS.maya } size={62} style={styles.heroAvatar} />
-              </View>
-              <View style={[styles.heroAvatarWrap, { borderColor: C.sofia, zIndex: 2, marginLeft: -28 }]}>
-                <Avatar uri={AVATARS.sofia } size={62} style={styles.heroAvatar} />
-              </View>
-              <View style={[styles.heroAvatarWrap, { borderColor: C.aria, zIndex: 1, marginLeft: -28 }]}>
-                <Avatar uri={AVATARS.aria } size={62} style={styles.heroAvatar} />
-              </View>
-              <View style={styles.heroAvatarsLabel}>
-                <Text style={styles.heroAvatarsTitle}>{t("home.startWithAvatar")}</Text>
-                <Text style={styles.heroAvatarsSub}>{t("home.tapToExplore")}</Text>
-              </View>
-            </View>
+                {/* Hero avatars row */}
+                <View style={styles.heroAvatars}>
+                  <View style={[styles.heroAvatarWrap, { borderColor: C.maya, zIndex: 3, marginLeft: 0 }]}>
+                    <Avatar uri={AVATARS.maya } size={62} style={styles.heroAvatar} />
+                  </View>
+                  <View style={[styles.heroAvatarWrap, { borderColor: C.sofia, zIndex: 2, marginLeft: -28 }]}>
+                    <Avatar uri={AVATARS.sofia } size={62} style={styles.heroAvatar} />
+                  </View>
+                  <View style={[styles.heroAvatarWrap, { borderColor: C.aria, zIndex: 1, marginLeft: -28 }]}>
+                    <Avatar uri={AVATARS.aria } size={62} style={styles.heroAvatar} />
+                  </View>
+                  <View style={styles.heroAvatarsLabel}>
+                    <Text style={styles.heroAvatarsTitle}>{t("home.startWithAvatar")}</Text>
+                    <Text style={styles.heroAvatarsSub}>{t("home.tapToExplore")}</Text>
+                  </View>
+                </View>
 
-            <View style={styles.heroCtas}>
-              <PressableCard
-                testID="hero-cta-primary"
-                style={styles.primaryBtn}
-                onPress={scrollToAvatars}
-              >
-                <Text style={styles.primaryBtnText}>{t("home.chooseAvatar")}</Text>
-                <Ionicons name="arrow-forward" size={16} color="#fff" />
-              </PressableCard>
-              <View style={styles.heroChip}>
-                <Ionicons name="cash-outline" size={14} color={C.emerald} />
-                <Text style={styles.heroChipText}>{t("home.noSubscription")}</Text>
+                <View style={styles.heroCtas}>
+                  <PressableCard
+                    testID="hero-cta-primary"
+                    style={styles.primaryBtn}
+                    onPress={scrollToAvatars}
+                  >
+                    <Text style={styles.primaryBtnText}>{t("home.chooseAvatar")}</Text>
+                    <Ionicons name="arrow-forward" size={16} color="#fff" />
+                  </PressableCard>
+                  <View style={styles.heroChip}>
+                    <Ionicons name="cash-outline" size={14} color={C.emerald} />
+                    <Text style={styles.heroChipText}>{t("home.noSubscription")}</Text>
+                  </View>
+                </View>
               </View>
+
+              {/* Desktop-only premium right-side visual composition. */}
+              {isDesktop ? <HeroRightVisual C={C} t={t} /> : null}
             </View>
           </View>
 
@@ -1516,6 +1778,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     overflow: "hidden",
     position: "relative",
+  },
+  /* Desktop hero — extra vertical padding + room for the right-side
+     premium visual composition. Mobile stays untouched. */
+  heroWrapDesktop: {
+    paddingTop: 36,
+    paddingBottom: 48,
+    paddingHorizontal: 40,
+  },
+  heroRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 24,
+  },
+  heroLeft: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: "center",
+    paddingVertical: 12,
   },
   heroBg: { ...StyleSheet.absoluteFillObject, opacity: 0.9 },
   earlyAccessPill: {

@@ -91,6 +91,18 @@ const C_default = {
 // definitions at module-load time (those serve as the light-mode baseline).
 const C = C_default;
 
+// Flag glyphs for the 6 supported languages. We use Regional Indicator
+// emojis (rather than imported icons) so they auto-theme and render natively
+// on iOS / Android / web without an extra dependency.
+const LANG_FLAG: Record<string, string> = {
+  en: "🇬🇧",
+  ro: "🇷🇴",
+  pl: "🇵🇱",
+  es: "🇪🇸",
+  pa: "🇮🇳", // Punjabi — written script is most commonly used in India/Pakistan; using IN flag.
+  ur: "🇵🇰",
+};
+
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 const AVATARS = {
   maya: `/avatars/maya.png`,
@@ -771,34 +783,75 @@ export default function Home() {
 
           {/* LANGUAGE SELECTOR */}
           <View style={styles.section}>
-            <View style={styles.langCard}>
+            <View style={[styles.langCard, { backgroundColor: C.card, borderColor: C.border }]}>
               <View style={styles.langHeader}>
-                <View style={styles.langIcon}>
+                <View style={[styles.langIcon, { backgroundColor: C.primarySoft }]}>
                   <Ionicons name="globe-outline" size={16} color={C.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.langTitle}>{t("lang.title")}</Text>
-                  <Text style={styles.langSub}>{t("lang.sub")}</Text>
+                  <Text style={[styles.langTitle, { color: C.text }]}>{t("lang.title")}</Text>
+                  <Text style={[styles.langSub, { color: C.text2 }]}>{t("lang.sub")}</Text>
+                </View>
+                <View style={[styles.langCountPill, { backgroundColor: C.primarySoft, borderColor: C.primary }]}>
+                  <Text style={[styles.langCountPillText, { color: C.primary }]}>{langs.length}</Text>
                 </View>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 4 }}>
+              {/* 2-column grid — all 6 languages visible without scrolling.
+                 Always LTR (the selector itself never mirrors). */}
+              <View style={[styles.langGrid, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
                 {langs.map((l) => {
                   const active = lang === l.code;
+                  const flag = LANG_FLAG[l.code] || "";
                   return (
                     <Pressable
                       key={l.code}
                       testID={`lang-${l.code}`}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${l.name} (${l.native})`}
+                      accessibilityState={{ selected: active }}
                       onPress={() => {
                         setLang(l.code as LangCode);
                         if (Platform.OS !== "web") Haptics.selectionAsync().catch(() => {});
                       }}
-                      style={[styles.langChip, active && styles.langChipActive]}
+                      hitSlop={4}
+                      style={({ pressed }) => [
+                        styles.langTile,
+                        {
+                          backgroundColor: active ? C.primary : C.bgSoft,
+                          borderColor: active ? C.primary : C.border,
+                          opacity: pressed ? 0.85 : 1,
+                          transform: [{ scale: pressed ? 0.98 : 1 }],
+                        },
+                      ]}
                     >
-                      <Text style={[styles.langChipText, active && styles.langChipTextActive]}>{l.native}</Text>
+                      <Text style={styles.langFlag}>{flag}</Text>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.langTileNative,
+                            { color: active ? "#fff" : C.text, writingDirection: "ltr" as any },
+                          ]}
+                        >
+                          {l.native}
+                        </Text>
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            styles.langTileName,
+                            { color: active ? "rgba(255,255,255,0.85)" : C.text2 },
+                          ]}
+                        >
+                          {l.name}
+                        </Text>
+                      </View>
+                      {active ? (
+                        <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                      ) : null}
                     </Pressable>
                   );
                 })}
-              </ScrollView>
+              </View>
             </View>
           </View>
 
@@ -1577,6 +1630,36 @@ const styles = StyleSheet.create({
   langChipActive: { backgroundColor: C.primary },
   langChipText: { fontSize: 13, fontWeight: "600", color: C.text2 },
   langChipTextActive: { color: "#fff" },
+  langGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    columnGap: 8,
+    rowGap: 8,
+    marginTop: 6,
+  },
+  langTile: {
+    width: "48%",
+    minHeight: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  langFlag: { fontSize: 22, lineHeight: 26 },
+  langTileNative: { fontSize: 15, fontWeight: "700" },
+  langTileName: { fontSize: 11, fontWeight: "500", marginTop: 1 },
+  langCountPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 26,
+    alignItems: "center",
+  },
+  langCountPillText: { fontSize: 11, fontWeight: "800" },
 
   /* Trust */
   trustGrid: {

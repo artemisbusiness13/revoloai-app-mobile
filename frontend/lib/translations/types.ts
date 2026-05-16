@@ -1,3 +1,19 @@
+export type LegalKind = "info" | "warning" | "danger" | "success";
+
+export interface StructuredLegalSection {
+  id: string;
+  kind: LegalKind;
+  icon: string;        // emoji icon shown next to heading
+  h: string;
+  bullets: string[];   // each bullet may contain **bold** markers
+}
+
+export interface StructuredLegalDoc {
+  title: string;
+  intro: string;
+  sections: StructuredLegalSection[];
+}
+
 export type Translations = {
   meta: { name: string; code: string; dir: "ltr" | "rtl" };
   common: Record<string, string>;
@@ -35,10 +51,20 @@ export type Translations = {
     terms:   { title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
     cookies: { title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
     deletion:{ title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
-    // Additional namespaces used by the T&C / IP compliance components.
-    tcGate?:      Record<string, string>;
-    serviceInfo?: Record<string, string>;
+    // T&C Gate compliance namespace.
+    tcGate?: Record<string, string> & {
+      // Structured legal documents shown in the gate.
+      termsDoc?: StructuredLegalDoc;
+      privacyDoc?: StructuredLegalDoc;
+      // Notice shown in non-EN languages explaining English is the binding original.
+      bindingNote?: string;
+      bindingNoteTitle?: string;
+    };
+    serviceInfo?: Record<string, string> & {
+      refundBullets?: string[];
+      howSteps?: string[];
+    };
     disclaimers?: Record<string, string>;
-    footer?:      Record<string, string>;
+    footer?: Record<string, string>;
   };
 };

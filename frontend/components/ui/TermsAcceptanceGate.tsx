@@ -1,13 +1,80 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View, NativeSyntheticEvent, NativeScrollEvent, Platform, Linking } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View, NativeSyntheticEvent, NativeScrollEvent, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useC, useTheme } from "./ThemeProvider";
 import { Button } from "./Button";
 import { DisclaimerBox } from "./Disclaimer";
+import { MdText } from "./MdText";
 import { radius, shadow, space } from "./theme";
 import { TC_VERSION, TERMS_CONTENT, PRIVACY_CONTENT } from "../../lib/legalContent";
 import { useTermsAcceptance } from "../../lib/useTermsAcceptance";
-import { useI18n } from "../../lib/i18n";
+import { useI18n, getDict } from "../../lib/i18n";
+import type { StructuredLegalDoc, StructuredLegalSection } from "../../lib/translations/types";
+
+type Variant = "info" | "warning" | "danger" | "success";
+
+function Section({ s, rtl }: { s: StructuredLegalSection; rtl: boolean }) {
+  const { palette } = useTheme();
+  const variant: Variant = (["info","warning","danger","success"] as const).includes(s.kind as any)
+    ? (s.kind as Variant) : "info";
+  const fg =
+    variant === "warning" ? palette.warning :
+    variant === "danger"  ? palette.danger  :
+    variant === "success" ? palette.success :
+                            palette.primary;
+
+  return (
+    <DisclaimerBox variant={variant} title={`${s.icon}  ${s.h}`}>
+      <View style={{ gap: 6 }}>
+        {s.bullets.map((b, i) => (
+          <View
+            key={`${s.id}-b${i}`}
+            style={{
+              flexDirection: rtl ? "row-reverse" : "row",
+              gap: 8,
+              alignItems: "flex-start",
+            }}
+          >
+            <Text style={{ color: fg, fontWeight: "800", lineHeight: 24, fontSize: 14 }}>•</Text>
+            <View style={{ flex: 1 }}>
+              <MdText color={fg} size={14} rtl={rtl}>{b}</MdText>
+            </View>
+          </View>
+        ))}
+      </View>
+    </DisclaimerBox>
+  );
+}
+
+function Doc({ doc, rtl, C }: { doc: StructuredLegalDoc; rtl: boolean; C: any }) {
+  return (
+    <View style={{ gap: 12 }}>
+      <Text
+        style={{
+          color: C.text, fontSize: 22, fontWeight: "800",
+          textAlign: rtl ? "right" : "left",
+          writingDirection: rtl ? "rtl" : "ltr",
+        }}
+      >
+        {doc.title}
+      </Text>
+      <Text
+        style={{
+          color: C.text2, fontSize: 14, lineHeight: 24, fontWeight: "500",
+          textAlign: rtl ? "right" : "left",
+          writingDirection: rtl ? "rtl" : "ltr",
+        }}
+      >
+        {doc.intro}
+      </Text>
+      <View style={{ gap: 12, marginTop: 4 }}>
+        {doc.sections.map((s) => (
+          <Section key={s.id} s={s} rtl={rtl} />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 export function TermsAcceptanceGate() {
   const { t, lang } = useI18n();
@@ -23,14 +90,41 @@ export function TermsAcceptanceGate() {
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     const remaining = contentSize.height - (contentOffset.y + layoutMeasurement.height);
-    if (remaining < 40 && !scrolledEnd) setScrolledEnd(true);
+    if (remaining < 60 && !scrolledEnd) setScrolledEnd(true);
   }, [scrolledEnd]);
 
   if (!ready) return null;
   if (accepted) return null;
 
   const canAccept = scrolledEnd && acceptT && acceptP;
-  const showNonEnglishNote = lang !== "en";
+  const isNonEnglish = lang !== "en";
+  const rtl = lang === "ur";
+
+  // Pull structured docs from i18n (per-locale dictionary) with English fallback
+  // to the static legacy content.
+  const dict = getDict(lang as any);
+  const termsDocAny = (dict as any)?.legal?.tcGate?.termsDoc;
+  const privDocAny  = (dict as any)?.legal?.tcGate?.privacyDoc;
+  const enFallbackTerms = (getDict("en" as any) as any)?.legal?.tcGate?.termsDoc;
+  const enFallbackPriv  = (getDict("en" as any) as any)?.legal?.tcGate?.privacyDoc;
+  const termsDoc: StructuredLegalDoc = (termsDocAny && typeof termsDocAny === "object")
+    ? termsDocAny
+    : (enFallbackTerms || {
+        title: TERMS_CONTENT.title,
+        intro: TERMS_CONTENT.intro,
+        sections: TERMS_CONTENT.sections.map((s, i) => ({
+          id: `t${i}`, kind: "info", icon: "📄", h: s.h, bullets: [s.p],
+        })),
+      });
+  const privacyDoc: StructuredLegalDoc = (privDocAny && typeof privDocAny === "object")
+    ? privDocAny
+    : (enFallbackPriv || {
+        title: PRIVACY_CONTENT.title,
+        intro: PRIVACY_CONTENT.intro,
+        sections: PRIVACY_CONTENT.sections.map((s, i) => ({
+          id: `p${i}`, kind: "info", icon: "📄", h: s.h, bullets: [s.p],
+        })),
+      });
 
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
@@ -40,7 +134,7 @@ export function TermsAcceptanceGate() {
           paddingTop: 48, paddingHorizontal: 20, paddingBottom: 14,
           backgroundColor: C.card,
           borderBottomWidth: 1, borderBottomColor: C.border,
-          flexDirection: "row", alignItems: "center", gap: 12,
+          flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 12,
           ...shadow(1, resolved === "dark"),
         }}>
           <View style={{
@@ -50,8 +144,16 @@ export function TermsAcceptanceGate() {
             <Text style={{ color: "#fff", fontWeight: "800", fontSize: 22 }}>r</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: C.text, fontWeight: "800", fontSize: 18 }}>{t("legal.tcGate.welcome")}</Text>
-            <Text style={{ color: C.text2, fontWeight: "500", fontSize: 12 }}>{t("legal.tcGate.subtitle")}</Text>
+            <Text style={{
+              color: C.text, fontWeight: "800", fontSize: 18,
+              textAlign: rtl ? "right" : "left",
+              writingDirection: rtl ? "rtl" : "ltr",
+            }}>{t("legal.tcGate.welcome")}</Text>
+            <Text style={{
+              color: C.text2, fontWeight: "500", fontSize: 12,
+              textAlign: rtl ? "right" : "left",
+              writingDirection: rtl ? "rtl" : "ltr",
+            }}>{t("legal.tcGate.subtitle")}</Text>
           </View>
           <View style={{
             paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
@@ -66,36 +168,32 @@ export function TermsAcceptanceGate() {
           ref={scrollRef}
           onScroll={onScroll}
           scrollEventThrottle={64}
-          contentContainerStyle={{ padding: 20, paddingBottom: 80 }}
+          contentContainerStyle={{ padding: 20, paddingBottom: 100, gap: 16 }}
         >
-          {showNonEnglishNote ? (
-            <DisclaimerBox variant="info" title={t("legal.tcGate.englishNoticeTitle")} style={{ marginBottom: 16 }}>
-              {t("legal.tcGate.englishNoticeBody")}
+          {isNonEnglish ? (
+            <DisclaimerBox variant="info" title={`🌐  ${t("legal.tcGate.bindingNoteTitle")}`}>
+              <MdText color={C.primary} size={13.5} rtl={rtl}>
+                {t("legal.tcGate.bindingNote")}
+              </MdText>
             </DisclaimerBox>
           ) : null}
 
-          <Text style={{ color: C.text, fontSize: 22, fontWeight: "800", marginBottom: 8 }}>{TERMS_CONTENT.title}</Text>
-          <Text style={{ color: C.text2, fontSize: 14, lineHeight: 22, marginBottom: 16 }}>{TERMS_CONTENT.intro}</Text>
-          {TERMS_CONTENT.sections.map((s, i) => (
-            <View key={i} style={{ marginBottom: 14 }}>
-              <Text style={{ color: C.text, fontSize: 15, fontWeight: "700", marginBottom: 4 }}>{s.h}</Text>
-              <Text style={{ color: C.text2, fontSize: 13.5, lineHeight: 22 }}>{s.p}</Text>
-            </View>
-          ))}
+          <Doc doc={termsDoc} rtl={rtl} C={C} />
 
-          <View style={{ height: 1, backgroundColor: C.border, marginVertical: 18 }} />
+          <View style={{ height: 1, backgroundColor: C.border, marginVertical: 6 }} />
 
-          <Text style={{ color: C.text, fontSize: 22, fontWeight: "800", marginBottom: 8 }}>{PRIVACY_CONTENT.title}</Text>
-          <Text style={{ color: C.text2, fontSize: 14, lineHeight: 22, marginBottom: 16 }}>{PRIVACY_CONTENT.intro}</Text>
-          {PRIVACY_CONTENT.sections.map((s, i) => (
-            <View key={i} style={{ marginBottom: 14 }}>
-              <Text style={{ color: C.text, fontSize: 15, fontWeight: "700", marginBottom: 4 }}>{s.h}</Text>
-              <Text style={{ color: C.text2, fontSize: 13.5, lineHeight: 22 }}>{s.p}</Text>
-            </View>
-          ))}
+          <Doc doc={privacyDoc} rtl={rtl} C={C} />
 
-          <View style={{ marginTop: 12, paddingVertical: 18, alignItems: "center" }}>
-            <Text style={{ color: C.text3, fontSize: 11 }}>— {t("legal.tcGate.endMarker")} —</Text>
+          {isNonEnglish ? (
+            <DisclaimerBox variant="warning" title={`⚠️  ${t("legal.tcGate.bindingNoteTitle")}`}>
+              <MdText color={C.warning} size={13} rtl={rtl}>
+                {t("legal.tcGate.bindingNote")}
+              </MdText>
+            </DisclaimerBox>
+          ) : null}
+
+          <View style={{ paddingVertical: 12, alignItems: "center" }}>
+            <Text style={{ color: C.text3, fontSize: 11, fontWeight: "600" }}>— {t("legal.tcGate.endMarker")} —</Text>
           </View>
         </ScrollView>
 
@@ -108,8 +206,8 @@ export function TermsAcceptanceGate() {
         }}>
           {!scrolledEnd ? (
             <View style={{
-              flexDirection: "row", alignItems: "center", gap: 6,
-              backgroundColor: C.warningSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: "flex-start",
+              flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 6,
+              backgroundColor: C.warningSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: rtl ? "flex-end" : "flex-start",
             }}>
               <Ionicons name="arrow-down" size={12} color={C.warning} />
               <Text style={{ color: C.warning, fontSize: 12, fontWeight: "700" }}>{t("legal.tcGate.scrollHint")}</Text>
@@ -121,7 +219,7 @@ export function TermsAcceptanceGate() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: acceptT }}
             onPress={() => setAcceptT((v) => !v)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
+            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
             hitSlop={8}
           >
             <View style={{
@@ -132,7 +230,11 @@ export function TermsAcceptanceGate() {
             }}>
               {acceptT ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
             </View>
-            <Text style={{ color: C.text, fontSize: 13, flex: 1, lineHeight: 18 }}>{t("legal.tcGate.checkbox1")}</Text>
+            <Text style={{
+              color: C.text, fontSize: 13, flex: 1, lineHeight: 18,
+              textAlign: rtl ? "right" : "left",
+              writingDirection: rtl ? "rtl" : "ltr",
+            }}>{t("legal.tcGate.checkbox1")}</Text>
           </Pressable>
 
           <Pressable
@@ -140,7 +242,7 @@ export function TermsAcceptanceGate() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: acceptP }}
             onPress={() => setAcceptP((v) => !v)}
-            style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
+            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
             hitSlop={8}
           >
             <View style={{
@@ -151,7 +253,11 @@ export function TermsAcceptanceGate() {
             }}>
               {acceptP ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
             </View>
-            <Text style={{ color: C.text, fontSize: 13, flex: 1, lineHeight: 18 }}>{t("legal.tcGate.checkbox2")}</Text>
+            <Text style={{
+              color: C.text, fontSize: 13, flex: 1, lineHeight: 18,
+              textAlign: rtl ? "right" : "left",
+              writingDirection: rtl ? "rtl" : "ltr",
+            }}>{t("legal.tcGate.checkbox2")}</Text>
           </Pressable>
 
           {declined ? (

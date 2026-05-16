@@ -8,5 +8,6 @@ export { CopyrightFooter, AIContentBadge } from "./CopyrightFooter";
 export { TermsAcceptanceGate } from "./TermsAcceptanceGate";
 export { ServiceInfoModal } from "./ServiceInfoModal";
 export { DisclaimerBox, LegalText } from "./Disclaimer";
+export { MdText } from "./MdText";
 export { lightPalette, darkPalette, type, space, radius, shadow } from "./theme";
 export type { Palette, ThemeMode, ResolvedTheme } from "./theme";

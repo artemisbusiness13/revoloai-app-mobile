@@ -129,50 +129,57 @@ export function TermsAcceptanceGate() {
   return (
     <Modal visible animationType="fade" transparent={false} statusBarTranslucent>
       <View style={{ flex: 1, backgroundColor: C.bg }}>
-        {/* Header */}
+        {/* Compact header (~12% target) */}
         <View style={{
-          paddingTop: 48, paddingHorizontal: 20, paddingBottom: 14,
+          paddingTop: 26, paddingHorizontal: 14, paddingBottom: 8,
           backgroundColor: C.card,
           borderBottomWidth: 1, borderBottomColor: C.border,
-          flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 12,
+          flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10,
           ...shadow(1, resolved === "dark"),
         }}>
           <View style={{
-            width: 44, height: 44, borderRadius: 12, backgroundColor: C.primary,
+            width: 36, height: 36, borderRadius: 10, backgroundColor: C.primary,
             alignItems: "center", justifyContent: "center",
           }}>
-            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 22 }}>r</Text>
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 18 }}>r</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{
-              color: C.text, fontWeight: "800", fontSize: 18,
-              textAlign: rtl ? "right" : "left",
-              writingDirection: rtl ? "rtl" : "ltr",
-            }}>{t("legal.tcGate.welcome")}</Text>
-            <Text style={{
-              color: C.text2, fontWeight: "500", fontSize: 12,
-              textAlign: rtl ? "right" : "left",
-              writingDirection: rtl ? "rtl" : "ltr",
-            }}>{t("legal.tcGate.subtitle")}</Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: C.text, fontWeight: "800", fontSize: 15,
+                textAlign: rtl ? "right" : "left",
+                writingDirection: rtl ? "rtl" : "ltr",
+              }}
+            >{t("legal.tcGate.welcome")}</Text>
+            <Text
+              numberOfLines={1}
+              style={{
+                color: C.text2, fontWeight: "500", fontSize: 11, marginTop: 1,
+                textAlign: rtl ? "right" : "left",
+                writingDirection: rtl ? "rtl" : "ltr",
+              }}
+            >{t("legal.tcGate.subtitle")}</Text>
           </View>
           <View style={{
-            paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999,
+            paddingHorizontal: 6, paddingVertical: 2, borderRadius: 999,
             backgroundColor: C.bgSoft, borderColor: C.border, borderWidth: 1,
           }}>
-            <Text style={{ color: C.text2, fontWeight: "700", fontSize: 10 }}>v{TC_VERSION}</Text>
+            <Text style={{ color: C.text2, fontWeight: "700", fontSize: 9 }}>v{TC_VERSION}</Text>
           </View>
         </View>
 
-        {/* Body */}
+        {/* Body — gets the lion's share (~73%) */}
         <ScrollView
           ref={scrollRef}
           onScroll={onScroll}
           scrollEventThrottle={64}
-          contentContainerStyle={{ padding: 20, paddingBottom: 100, gap: 16 }}
+          contentContainerStyle={{ padding: 14, paddingBottom: 24, gap: 12 }}
+          style={{ flex: 1 }}
         >
           {isNonEnglish ? (
             <DisclaimerBox variant="info" title={`🌐  ${t("legal.tcGate.bindingNoteTitle")}`}>
-              <MdText color={C.primary} size={13.5} rtl={rtl}>
+              <MdText color={C.primary} size={13} rtl={rtl}>
                 {t("legal.tcGate.bindingNote")}
               </MdText>
             </DisclaimerBox>
@@ -180,37 +187,37 @@ export function TermsAcceptanceGate() {
 
           <Doc doc={termsDoc} rtl={rtl} C={C} />
 
-          <View style={{ height: 1, backgroundColor: C.border, marginVertical: 6 }} />
+          <View style={{ height: 1, backgroundColor: C.border, marginVertical: 4 }} />
 
           <Doc doc={privacyDoc} rtl={rtl} C={C} />
 
           {isNonEnglish ? (
             <DisclaimerBox variant="warning" title={`⚠️  ${t("legal.tcGate.bindingNoteTitle")}`}>
-              <MdText color={C.warning} size={13} rtl={rtl}>
+              <MdText color={C.warning} size={12.5} rtl={rtl}>
                 {t("legal.tcGate.bindingNote")}
               </MdText>
             </DisclaimerBox>
           ) : null}
 
-          <View style={{ paddingVertical: 12, alignItems: "center" }}>
+          <View style={{ paddingVertical: 8, alignItems: "center" }}>
             <Text style={{ color: C.text3, fontSize: 11, fontWeight: "600" }}>— {t("legal.tcGate.endMarker")} —</Text>
           </View>
         </ScrollView>
 
-        {/* Sticky footer */}
+        {/* Compact sticky footer (~15% target) */}
         <View style={{
-          paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24,
+          paddingHorizontal: 14, paddingTop: 8, paddingBottom: 14,
           backgroundColor: C.card, borderTopColor: C.border, borderTopWidth: 1,
-          gap: 10,
+          gap: 6,
           ...shadow(2, resolved === "dark"),
         }}>
           {!scrolledEnd ? (
             <View style={{
-              flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 6,
-              backgroundColor: C.warningSoft, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 999, alignSelf: rtl ? "flex-end" : "flex-start",
+              flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 5,
+              backgroundColor: C.warningSoft, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999, alignSelf: rtl ? "flex-end" : "flex-start",
             }}>
-              <Ionicons name="arrow-down" size={12} color={C.warning} />
-              <Text style={{ color: C.warning, fontSize: 12, fontWeight: "700" }}>{t("legal.tcGate.scrollHint")}</Text>
+              <Ionicons name="arrow-down" size={11} color={C.warning} />
+              <Text style={{ color: C.warning, fontSize: 11, fontWeight: "700" }}>{t("legal.tcGate.scrollHint")}</Text>
             </View>
           ) : null}
 
@@ -219,22 +226,25 @@ export function TermsAcceptanceGate() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: acceptT }}
             onPress={() => setAcceptT((v) => !v)}
-            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
-            hitSlop={8}
+            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 8, paddingVertical: 2, minHeight: 32 }}
+            hitSlop={10}
           >
             <View style={{
-              width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+              width: 18, height: 18, borderRadius: 5, borderWidth: 2,
               borderColor: acceptT ? C.primary : C.border,
               backgroundColor: acceptT ? C.primary : "transparent",
               alignItems: "center", justifyContent: "center",
             }}>
-              {acceptT ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+              {acceptT ? <Ionicons name="checkmark" size={11} color="#fff" /> : null}
             </View>
-            <Text style={{
-              color: C.text, fontSize: 13, flex: 1, lineHeight: 18,
-              textAlign: rtl ? "right" : "left",
-              writingDirection: rtl ? "rtl" : "ltr",
-            }}>{t("legal.tcGate.checkbox1")}</Text>
+            <Text
+              numberOfLines={2}
+              style={{
+                color: C.text, fontSize: 12, flex: 1, lineHeight: 16,
+                textAlign: rtl ? "right" : "left",
+                writingDirection: rtl ? "rtl" : "ltr",
+              }}
+            >{t("legal.tcGate.checkbox1")}</Text>
           </Pressable>
 
           <Pressable
@@ -242,34 +252,38 @@ export function TermsAcceptanceGate() {
             accessibilityRole="checkbox"
             accessibilityState={{ checked: acceptP }}
             onPress={() => setAcceptP((v) => !v)}
-            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 10, paddingVertical: 4 }}
-            hitSlop={8}
+            style={{ flexDirection: rtl ? "row-reverse" : "row", alignItems: "center", gap: 8, paddingVertical: 2, minHeight: 32 }}
+            hitSlop={10}
           >
             <View style={{
-              width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+              width: 18, height: 18, borderRadius: 5, borderWidth: 2,
               borderColor: acceptP ? C.primary : C.border,
               backgroundColor: acceptP ? C.primary : "transparent",
               alignItems: "center", justifyContent: "center",
             }}>
-              {acceptP ? <Ionicons name="checkmark" size={14} color="#fff" /> : null}
+              {acceptP ? <Ionicons name="checkmark" size={11} color="#fff" /> : null}
             </View>
-            <Text style={{
-              color: C.text, fontSize: 13, flex: 1, lineHeight: 18,
-              textAlign: rtl ? "right" : "left",
-              writingDirection: rtl ? "rtl" : "ltr",
-            }}>{t("legal.tcGate.checkbox2")}</Text>
+            <Text
+              numberOfLines={2}
+              style={{
+                color: C.text, fontSize: 12, flex: 1, lineHeight: 16,
+                textAlign: rtl ? "right" : "left",
+                writingDirection: rtl ? "rtl" : "ltr",
+              }}
+            >{t("legal.tcGate.checkbox2")}</Text>
           </Pressable>
 
           {declined ? (
-            <Text style={{ color: C.danger, fontSize: 12, fontWeight: "700" }}>{t("legal.tcGate.mustAcceptMessage")}</Text>
+            <Text style={{ color: C.danger, fontSize: 11, fontWeight: "700" }}>{t("legal.tcGate.mustAcceptMessage")}</Text>
           ) : null}
 
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flexDirection: "row", gap: 6, marginTop: 2 }}>
             <View style={{ flex: 1 }}>
               <Button
                 testID="tc-decline-btn"
                 title={t("legal.tcGate.decline")}
                 variant="secondary"
+                size="sm"
                 onPress={() => setDeclined(true)}
                 fullWidth
               />
@@ -279,6 +293,7 @@ export function TermsAcceptanceGate() {
                 testID="tc-accept-btn"
                 title={t("legal.tcGate.accept")}
                 variant="primary"
+                size="sm"
                 disabled={!canAccept}
                 onPress={accept}
                 fullWidth

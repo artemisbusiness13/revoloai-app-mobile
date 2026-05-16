@@ -233,7 +233,7 @@ export default function CheckoutScreen() {
           {/* Avatar header */}
           <View style={[styles.avatarHeader, { backgroundColor: meta.soft }]}>
             <View style={[styles.headerAvatarRing, { borderColor: meta.color }]}>
-              <Avatar uri={AVATARS[key]} size={50} />
+              <Avatar uri={AVATARS[key]} size={62} />
             </View>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.smallLabel}>{t(`avatars.${key}.role`).toUpperCase()}</Text>
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   headerAvatarRing: {
-    width: 60, height: 60, borderRadius: 30, borderWidth: 3, overflow: "hidden", backgroundColor: "#fff",
+    width: 75, height: 75, borderRadius: 37.5, borderWidth: 3, overflow: "hidden", backgroundColor: "#fff",
   },
   smallLabel: { fontSize: 11, fontWeight: "700", color: "#5B6577", letterSpacing: 0.4 },
   avatarName: { fontSize: 22, fontWeight: "800", marginTop: 2 },

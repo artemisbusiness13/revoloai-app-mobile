@@ -95,7 +95,7 @@ export default function InterviewScreen() {
             <Ionicons name="close" size={22} color="#0B0F19" />
           </Pressable>
           <View style={[st.avatarRing, { borderColor: C_SOFIA }]}>
-            <Avatar uri={AVATARS.sofia} size={36} />
+            <Avatar uri={AVATARS.sofia} size={46} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={st.hTitle}>{t("interview.title")}</Text>
@@ -191,7 +191,7 @@ const st = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FAFAFB" },
   header: { flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff" },
   iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-  avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, overflow: "hidden", backgroundColor: "#fff" },
+  avatarRing: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, overflow: "hidden", backgroundColor: "#fff" },
   hTitle: { fontSize: 15, fontWeight: "800", color: "#0B0F19" },
   hSub: { fontSize: 12, color: "#5B6577", marginTop: 2, textTransform: "capitalize" },
   progressBox: { paddingHorizontal: 10, paddingVertical: 6, backgroundColor: "#FDECF5", borderRadius: 999 },

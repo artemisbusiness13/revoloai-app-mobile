@@ -271,7 +271,7 @@ function AvatarChip({
   return (
     <PressableCard testID={testID} onPress={onPress} style={[styles.avatarCard, { backgroundColor: bg }]}>
       <View style={[styles.avatarRing, { borderColor: color }]}>
-        <Avatar uri={src } size={66} style={styles.avatarImg} />
+        <Avatar uri={src } size={84} style={styles.avatarImg} />
       </View>
       <Text style={styles.avatarRole}>{role}</Text>
       <Text style={[styles.avatarName, { color }]}>{name}</Text>
@@ -771,13 +771,13 @@ export default function Home() {
             {/* Hero avatars row */}
             <View style={styles.heroAvatars}>
               <View style={[styles.heroAvatarWrap, { borderColor: C.maya, zIndex: 3, marginLeft: 0 }]}>
-                <Avatar uri={AVATARS.maya } size={50} style={styles.heroAvatar} />
+                <Avatar uri={AVATARS.maya } size={62} style={styles.heroAvatar} />
               </View>
-              <View style={[styles.heroAvatarWrap, { borderColor: C.sofia, zIndex: 2, marginLeft: -22 }]}>
-                <Avatar uri={AVATARS.sofia } size={50} style={styles.heroAvatar} />
+              <View style={[styles.heroAvatarWrap, { borderColor: C.sofia, zIndex: 2, marginLeft: -28 }]}>
+                <Avatar uri={AVATARS.sofia } size={62} style={styles.heroAvatar} />
               </View>
-              <View style={[styles.heroAvatarWrap, { borderColor: C.aria, zIndex: 1, marginLeft: -22 }]}>
-                <Avatar uri={AVATARS.aria } size={50} style={styles.heroAvatar} />
+              <View style={[styles.heroAvatarWrap, { borderColor: C.aria, zIndex: 1, marginLeft: -28 }]}>
+                <Avatar uri={AVATARS.aria } size={62} style={styles.heroAvatar} />
               </View>
               <View style={styles.heroAvatarsLabel}>
                 <Text style={styles.heroAvatarsTitle}>{t("home.startWithAvatar")}</Text>
@@ -962,7 +962,7 @@ export default function Home() {
           <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28, marginTop: 8 }]} onLayout={(e) => (servicesY.current.maya = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.maya }]}>
-                <Avatar uri={AVATARS.maya } size={50} style={styles.personImg} />
+                <Avatar uri={AVATARS.maya } size={62} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <SectionLabel label={t("services.mayaLabel")} color={C.maya} />
@@ -981,7 +981,7 @@ export default function Home() {
           <View style={[styles.section, { paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.sofia = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.sofia }]}>
-                <Avatar uri={AVATARS.sofia } size={50} style={styles.personImg} />
+                <Avatar uri={AVATARS.sofia } size={62} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <SectionLabel label={t("services.sofiaLabel")} color={C.sofia} />
@@ -1000,7 +1000,7 @@ export default function Home() {
           <View style={[styles.section, { backgroundColor: "#fff", paddingVertical: 28 }]} onLayout={(e) => (servicesY.current.aria = e.nativeEvent.layout.y)}>
             <View style={styles.servicePerson}>
               <View style={[styles.personRing, { borderColor: C.aria }]}>
-                <Avatar uri={AVATARS.aria } size={50} style={styles.personImg} />
+                <Avatar uri={AVATARS.aria } size={62} style={styles.personImg} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <SectionLabel label={t("services.ariaLabel")} color={C.aria} />
@@ -1060,8 +1060,8 @@ export default function Home() {
             <SectionTitle>{t("conversation.title")}</SectionTitle>
             <View style={styles.chatCard}>
               <View style={styles.chatHeader}>
-                <View style={[styles.personRing, { borderColor: C.sofia, width: 40, height: 40 }]}>
-                  <Avatar uri={AVATARS.sofia } size={50} style={styles.personImg} />
+                <View style={[styles.personRing, { borderColor: C.sofia, width: 50, height: 50 }]}>
+                  <Avatar uri={AVATARS.sofia } size={62} style={styles.personImg} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 10 }}>
                   <Text style={styles.chatName}>Sofia</Text>
@@ -1143,10 +1143,10 @@ export default function Home() {
                 <View style={[styles.finalAvatarWrap, { borderColor: C.maya, marginLeft: 0 }]}>
                   <Avatar uri={AVATARS.maya } size={50} style={styles.finalAvatar} />
                 </View>
-                <View style={[styles.finalAvatarWrap, { borderColor: C.sofia, marginLeft: -16 }]}>
+                <View style={[styles.finalAvatarWrap, { borderColor: C.sofia, marginLeft: -20 }]}>
                   <Avatar uri={AVATARS.sofia } size={50} style={styles.finalAvatar} />
                 </View>
-                <View style={[styles.finalAvatarWrap, { borderColor: C.aria, marginLeft: -16 }]}>
+                <View style={[styles.finalAvatarWrap, { borderColor: C.aria, marginLeft: -20 }]}>
                   <Avatar uri={AVATARS.aria } size={50} style={styles.finalAvatar} />
                 </View>
               </View>
@@ -1558,9 +1558,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   heroAvatarWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 3,
     backgroundColor: "#fff",
     overflow: "hidden",
@@ -1731,13 +1731,13 @@ const styles = StyleSheet.create({
     ...cardShadow,
   },
   avatarRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     borderWidth: 3,
     backgroundColor: "#fff",
     overflow: "hidden",
-    marginBottom: 10,
+    marginBottom: 12,
   },
   avatarImg: { width: "100%", height: "100%", resizeMode: "cover" },
   avatarRole: { fontSize: 11, color: C.text2, fontWeight: "600" },
@@ -1746,9 +1746,9 @@ const styles = StyleSheet.create({
   /* Service person header */
   servicePerson: { flexDirection: "row", alignItems: "center", marginBottom: 18 },
   personRing: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     borderWidth: 3,
     overflow: "hidden",
     backgroundColor: "#fff",

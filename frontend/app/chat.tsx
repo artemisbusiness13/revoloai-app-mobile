@@ -414,7 +414,7 @@ export default function ChatScreen() {
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
           <View style={[styles.headerAvatar, { borderColor: meta.color }]}>
-            <Avatar uri={AVATARS[key]} size={38} />
+            <Avatar uri={AVATARS[key]} size={48} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={[styles.headerName, { color: C.text }]}>{aName}</Text>
@@ -589,9 +589,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 55,
+    height: 55,
+    borderRadius: 27.5,
     borderWidth: 2,
     overflow: "hidden",
     backgroundColor: "#fff",

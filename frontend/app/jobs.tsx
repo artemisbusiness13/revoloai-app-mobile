@@ -168,7 +168,7 @@ export default function JobsScreen() {
             <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
           <View style={[s.avatarRing, { borderColor: meta.color }]}>
-            <Avatar uri={AVATARS[key]} size={36} />
+            <Avatar uri={AVATARS[key]} size={46} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={[s.hTitle, { color: C.text }]}>{t("jobs.title")}</Text>
@@ -323,7 +323,7 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FAFAFB" },
   header: { flexDirection: "row", alignItems: "center", padding: 12, backgroundColor: "#fff", borderBottomWidth: 1, borderBottomColor: "#ECEEF3" },
   iconBtn: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
-  avatarRing: { width: 40, height: 40, borderRadius: 20, borderWidth: 2, overflow: "hidden", backgroundColor: "#fff" },
+  avatarRing: { width: 50, height: 50, borderRadius: 25, borderWidth: 2, overflow: "hidden", backgroundColor: "#fff" },
   hTitle: { fontSize: 15, fontWeight: "800", color: "#0B0F19" },
   hSub: { fontSize: 12, color: "#5B6577", marginTop: 2 },
   empty: { textAlign: "center", color: "#5B6577", marginTop: 40 },

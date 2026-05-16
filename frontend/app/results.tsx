@@ -73,7 +73,7 @@ export default function ResultsScreen() {
             {/* Hero */}
             <View style={st.hero}>
               <View style={[st.ring, { borderColor: SOFIA }]}>
-                <Avatar uri={AVATARS.sofia} size={56} />
+                <Avatar uri={AVATARS.sofia} size={70} />
               </View>
               <View style={{ flex: 1, marginLeft: 14 }}>
                 <Text style={st.role}>{data?.role || "Generalist"} · {data?.seniority || "mid"}</Text>
@@ -232,7 +232,7 @@ const st = StyleSheet.create({
   hTitle: { fontSize: 16, fontWeight: "800", color: "#0B0F19" },
 
   hero: { flexDirection: "row", alignItems: "center", padding: 18, backgroundColor: "#fff", borderRadius: 22, borderWidth: 1, borderColor: "#ECEEF3", marginBottom: 14 },
-  ring: { width: 64, height: 64, borderRadius: 32, borderWidth: 3, overflow: "hidden", backgroundColor: "#fff" },
+  ring: { width: 80, height: 80, borderRadius: 40, borderWidth: 3, overflow: "hidden", backgroundColor: "#fff" },
   role: { fontSize: 12, color: "#5B6577", textTransform: "capitalize", fontWeight: "700" },
   verdict: { fontSize: 22, fontWeight: "800", color: "#0B0F19", marginTop: 2 },
   scoreCircle: { width: 76, height: 76, borderRadius: 38, alignItems: "center", justifyContent: "center", backgroundColor: "#FDECF5" },

@@ -33,6 +33,8 @@ import { useAuth } from "../lib/auth";
 import { useC, ThemeToggle, useTheme, CopyrightFooter } from "../components/ui";
 import { TermsAcceptanceGate } from "../components/ui/TermsAcceptanceGate";
 import { useTermsAcceptance } from "../lib/useTermsAcceptance";
+import { TC_VERSION } from "../lib/legalContent";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -669,14 +671,40 @@ export default function Home() {
         setSignInOpen(false);
         setSignInName(""); setSignInEmail(""); setSignInPwd("");
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        // T&C gate sits between signup and onboarding. If the user has already
-        // accepted the current T&C version (e.g. a prior signup on this device),
-        // skip straight to onboarding. Otherwise pop the gate; profile push
-        // happens from its onAccept handler.
-        if (tc.accepted) {
+
+        // Diagnostics — confirm storage state at decision time (read directly
+        // from AsyncStorage to bypass any stale React state).
+        let storedOk: string | null = null;
+        let storedVer: string | null = null;
+        try {
+          storedOk = await AsyncStorage.getItem("revolo.tc.accepted");
+          storedVer = await AsyncStorage.getItem("revolo.tc.version");
+        } catch {}
+        const acceptedNow = storedOk === "true" && storedVer === TC_VERSION;
+        // eslint-disable-next-line no-console
+        console.log("[signup] success", {
+          email: signInEmail.trim(),
+          tcAcceptedHook: tc.accepted,
+          tcAcceptedStorage: acceptedNow,
+          storedOk, storedVer, currentVersion: TC_VERSION,
+          tcGateOpen,
+        });
+
+        // If T&C for current version is already accepted on this device,
+        // skip the gate and go to profile onboarding.
+        // Otherwise: leave navigation alone — the global <PostAuthTermsGuard />
+        // will immediately overlay the T&C modal because user is now authed
+        // and tc.accepted is false. After they accept, they can proceed.
+        if (acceptedNow) {
+          // eslint-disable-next-line no-console
+          console.log("[signup] nav target: /profile (T&C already accepted)");
           router.push("/profile");
         } else {
-          setTcGateOpen(true);
+          // eslint-disable-next-line no-console
+          console.log("[signup] nav target: stay on home; PostAuthTermsGuard will open T&C");
+          // We DO push to /profile but the gate will overlay immediately and
+          // block interaction. On accept the gate hides and profile is ready.
+          router.push("/profile");
         }
       } else {
         if (!signInEmail.trim() || !signInPwd) {
@@ -1452,21 +1480,6 @@ export default function Home() {
           </View>
         )}
       </SafeAreaView>
-
-      {/* Post-signup Terms & Conditions gate. Visible only after a successful
-          signup if the user has not yet accepted the current T&C version. */}
-      <TermsAcceptanceGate
-        visible={tcGateOpen}
-        onAccept={() => {
-          setTcGateOpen(false);
-          router.push("/profile");
-        }}
-        onDecline={() => {
-          // Block onboarding. Close the gate; user remains on home. They can
-          // sign up again or open the gate by re-attempting signup.
-          setTcGateOpen(false);
-        }}
-      />
     </View>
   );
 }

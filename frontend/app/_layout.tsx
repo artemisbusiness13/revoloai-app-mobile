@@ -7,7 +7,6 @@ import { DemoProvider } from "../lib/demo";
 import { AuthProvider } from "../lib/auth";
 import DemoLauncher from "../components/DemoLauncher";
 import { ThemeProvider, useTheme } from "../components/ui";
-import { TermsAcceptanceGate } from "../components/ui/TermsAcceptanceGate";
 
 /**
  * Inner layout that reads the resolved theme so the global Stack background
@@ -47,7 +46,10 @@ export default function RootLayout() {
             <AuthProvider>
               <DemoProvider>
                 <ThemedStack />
-                <TermsAcceptanceGate />
+                {/* TermsAcceptanceGate intentionally NOT mounted here.
+                   It is now triggered post-signup from app/index.tsx so the
+                   user sees Sign-up → enter name/email/password → T&C →
+                   profile onboarding. Existing accepted users skip the gate. */}
                 <DemoLauncher />
               </DemoProvider>
             </AuthProvider>

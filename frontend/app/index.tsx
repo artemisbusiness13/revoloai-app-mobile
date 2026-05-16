@@ -31,6 +31,8 @@ import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
 import { useAuth } from "../lib/auth";
 import { useC, ThemeToggle, useTheme, CopyrightFooter } from "../components/ui";
+import { TermsAcceptanceGate } from "../components/ui/TermsAcceptanceGate";
+import { useTermsAcceptance } from "../lib/useTermsAcceptance";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -434,6 +436,13 @@ export default function Home() {
   const [signInPwd, setSignInPwd] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInErr, setSignInErr] = useState<string | null>(null);
+
+  // Terms & Conditions — moved out of first-launch and into the post-signup flow.
+  // After a successful signup, we check the user's existing acceptance: if they
+  // already accepted, we go straight to /profile; otherwise we open the gate and
+  // only push to /profile once they accept. Login flow is unchanged.
+  const tc = useTermsAcceptance();
+  const [tcGateOpen, setTcGateOpen] = useState(false);
   // Open the signin modal when redirected here with ?signin=1 (e.g. from
   // /checkout when the user is not logged in).
   const homeParams = useLocalSearchParams<{ signin?: string; paid?: string }>();
@@ -660,8 +669,15 @@ export default function Home() {
         setSignInOpen(false);
         setSignInName(""); setSignInEmail(""); setSignInPwd("");
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-        // Send the user to fill their profile (mandatory onboarding)
-        router.push("/profile");
+        // T&C gate sits between signup and onboarding. If the user has already
+        // accepted the current T&C version (e.g. a prior signup on this device),
+        // skip straight to onboarding. Otherwise pop the gate; profile push
+        // happens from its onAccept handler.
+        if (tc.accepted) {
+          router.push("/profile");
+        } else {
+          setTcGateOpen(true);
+        }
       } else {
         if (!signInEmail.trim() || !signInPwd) {
           setSignInErr(t("account.fillAll"));
@@ -1436,6 +1452,21 @@ export default function Home() {
           </View>
         )}
       </SafeAreaView>
+
+      {/* Post-signup Terms & Conditions gate. Visible only after a successful
+          signup if the user has not yet accepted the current T&C version. */}
+      <TermsAcceptanceGate
+        visible={tcGateOpen}
+        onAccept={() => {
+          setTcGateOpen(false);
+          router.push("/profile");
+        }}
+        onDecline={() => {
+          // Block onboarding. Close the gate; user remains on home. They can
+          // sign up again or open the gate by re-attempting signup.
+          setTcGateOpen(false);
+        }}
+      />
     </View>
   );
 }

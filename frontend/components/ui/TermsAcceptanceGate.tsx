@@ -77,7 +77,30 @@ function Doc({ doc, rtl, C }: { doc: StructuredLegalDoc; rtl: boolean; C: any })
   );
 }
 
-export function TermsAcceptanceGate() {
+/**
+ * TermsAcceptanceGate
+ *
+ * Two modes:
+ *  1. **Auto mode** (no props): self-mounts a full-screen modal whenever the
+ *     user has not yet accepted the current T&C version. Kept for backwards
+ *     compatibility. NOTE: no longer mounted in app/_layout.tsx — the gate now
+ *     only appears post-signup.
+ *  2. **Controlled mode**: pass `visible`, `onAccept` and `onDecline` to drive
+ *     the modal from a parent flow (e.g. show after the signup form, before
+ *     pushing the user into the profile onboarding).
+ *
+ * In controlled mode the gate ignores stored acceptance state and shows
+ * whenever `visible === true`, so the caller is responsible for skipping the
+ * gate when `useTermsAcceptance().accepted` is already true.
+ */
+export interface TermsAcceptanceGateProps {
+  visible?: boolean;
+  onAccept?: () => void;
+  onDecline?: () => void;
+}
+
+export function TermsAcceptanceGate(props: TermsAcceptanceGateProps = {}) {
+  const controlled = typeof props.visible === "boolean";
   const { t, lang } = useI18n();
   const { ready, accepted, accept } = useTermsAcceptance();
   const C = useC();
@@ -88,14 +111,41 @@ export function TermsAcceptanceGate() {
   const [declined, setDeclined] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
 
+  // Reset all transient state every time the gate is (re)opened in controlled mode.
+  React.useEffect(() => {
+    if (controlled && props.visible) {
+      setScrolledEnd(false);
+      setAcceptT(false);
+      setAcceptP(false);
+      setDeclined(false);
+      try { scrollRef.current?.scrollTo({ y: 0, animated: false }); } catch {}
+    }
+  }, [controlled, props.visible]);
+
   const onScroll = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
     const remaining = contentSize.height - (contentOffset.y + layoutMeasurement.height);
     if (remaining < 60 && !scrolledEnd) setScrolledEnd(true);
   }, [scrolledEnd]);
 
-  if (!ready) return null;
-  if (accepted) return null;
+  // ── Visibility logic ──────────────────────────────────────────────
+  // Auto mode: respect storage flag (legacy/backwards-compat).
+  // Controlled mode: parent drives visibility regardless of storage.
+  if (controlled) {
+    if (!props.visible) return null;
+  } else {
+    if (!ready) return null;
+    if (accepted) return null;
+  }
+
+  const handleAccept = async () => {
+    await accept();
+    props.onAccept?.();
+  };
+  const handleDecline = () => {
+    setDeclined(true);
+    props.onDecline?.();
+  };
 
   const canAccept = scrolledEnd && acceptT && acceptP;
   const isNonEnglish = lang !== "en";
@@ -295,7 +345,7 @@ export function TermsAcceptanceGate() {
                 title={t("legal.tcGate.decline")}
                 variant="secondary"
                 size="sm"
-                onPress={() => setDeclined(true)}
+                onPress={handleDecline}
                 fullWidth
               />
             </View>
@@ -306,7 +356,7 @@ export function TermsAcceptanceGate() {
                 variant="primary"
                 size="sm"
                 disabled={!canAccept}
-                onPress={accept}
+                onPress={handleAccept}
                 fullWidth
                 rightIcon="arrow-forward"
               />

@@ -6,35 +6,51 @@ import { I18nProvider } from "../lib/i18n";
 import { DemoProvider } from "../lib/demo";
 import { AuthProvider } from "../lib/auth";
 import DemoLauncher from "../components/DemoLauncher";
+import { ThemeProvider, useTheme } from "../components/ui";
+
+/**
+ * Inner layout that reads the resolved theme so the global Stack background
+ * and StatusBar tint always match light/dark.
+ */
+function ThemedStack() {
+  const { resolved, palette } = useTheme();
+  return (
+    <>
+      <StatusBar style={resolved === "dark" ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.bg },
+          animation: "slide_from_right",
+        }}
+      >
+        <Stack.Screen name="index" />
+        <Stack.Screen name="profile" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="chat" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="checkout" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="jobs" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="interview" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="results" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+        <Stack.Screen name="legal/[slug]" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
+      </Stack>
+    </>
+  );
+}
 
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <I18nProvider>
-          <AuthProvider>
-            <DemoProvider>
-              <StatusBar style="dark" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "#FAFAFA" },
-                  animation: "slide_from_right",
-                }}
-              >
-                <Stack.Screen name="index" />
-                <Stack.Screen name="profile" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="chat" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="checkout" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="jobs" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="interview" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="results" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-                <Stack.Screen name="legal/[slug]" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
-              </Stack>
-              <DemoLauncher />
-            </DemoProvider>
-          </AuthProvider>
-        </I18nProvider>
+        <ThemeProvider>
+          <I18nProvider>
+            <AuthProvider>
+              <DemoProvider>
+                <ThemedStack />
+                <DemoLauncher />
+              </DemoProvider>
+            </AuthProvider>
+          </I18nProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

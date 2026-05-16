@@ -18,6 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Avatar } from "../components/Avatar";
+import { useC, ThemeToggle, AvatarBubbleSkeleton } from "../components/ui";
 import {
   AVATARS,
   AVATAR_META,
@@ -44,6 +45,7 @@ export default function ChatScreen() {
   const meta = AVATAR_META[key];
   const { t, langName, lang } = useI18n();
   const { user } = useAuth();
+  const C = useC();
   const isRTL = lang === "ur";
   const aName = t(`avatars.${key}.name`);
   const aRole = t(`avatars.${key}.role`);
@@ -398,29 +400,30 @@ export default function ChatScreen() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: C.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Header */}
-        <View style={[styles.header, { borderBottomColor: meta.soft }, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
+        <View style={[styles.header, { backgroundColor: C.card, borderBottomColor: meta.soft }, Platform.OS === "web" && ({ direction: "ltr" } as any)]}>
           <Pressable
             testID="chat-close-btn"
             onPress={() => router.back()}
             style={styles.headerBtn}
             hitSlop={10}
           >
-            <Ionicons name="chevron-back" size={22} color="#0B0F19" />
+            <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
           <View style={[styles.headerAvatar, { borderColor: meta.color }]}>
             <Avatar uri={AVATARS[key]} size={38} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={styles.headerName}>{aName}</Text>
+            <Text style={[styles.headerName, { color: C.text }]}>{aName}</Text>
             <View style={styles.statusRow}>
               <View style={[styles.statusDot, { backgroundColor: "#10B981" }]} />
-              <Text style={styles.statusText}>{listening ? t("chat.listening") : sending ? t("chat.typing") : aRole}</Text>
+              <Text style={[styles.statusText, { color: C.text2 }]}>{listening ? t("chat.listening") : sending ? t("chat.typing") : aRole}</Text>
             </View>
           </View>
+          <ThemeToggle />
           <Pressable
             testID="chat-speaker-btn"
             style={styles.headerBtn}
@@ -431,11 +434,11 @@ export default function ChatScreen() {
             <Ionicons
               name={speakerOn ? "volume-high" : "volume-mute"}
               size={20}
-              color={speakerOn ? meta.color : "#5B6577"}
+              color={speakerOn ? meta.color : C.text2}
             />
           </Pressable>
           <Pressable testID="chat-info-btn" style={styles.headerBtn} hitSlop={10} onPress={() => Alert.alert(aName, `${aRole} — ${t("chat.info", { name: aName })}`)}>
-            <Ionicons name="information-circle-outline" size={22} color="#5B6577" />
+            <Ionicons name="information-circle-outline" size={22} color={C.text2} />
           </Pressable>
         </View>
 
@@ -458,12 +461,12 @@ export default function ChatScreen() {
                     styles.bubble,
                     m.role === "user"
                       ? [styles.bubbleUser, { backgroundColor: meta.color }]
-                      : styles.bubbleAi,
+                      : [styles.bubbleAi, { backgroundColor: C.card, borderColor: C.border }],
                   ]}
                 >
                   <Text
                     style={[
-                      m.role === "user" ? styles.bubbleUserText : styles.bubbleAiText,
+                      m.role === "user" ? styles.bubbleUserText : [styles.bubbleAiText, { color: C.text }],
                       isRTL && { writingDirection: "rtl", textAlign: "right" },
                     ]}
                   >

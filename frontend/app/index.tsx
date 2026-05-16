@@ -30,6 +30,7 @@ import {
 import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
 import { useAuth } from "../lib/auth";
+import { useC, ThemeToggle, useTheme } from "../components/ui";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -64,7 +65,7 @@ function Avatar({
 }
 
 /* ---------- Theme ---------- */
-const C = {
+const C_default = {
   bg: "#FAFAFB",
   bgSoft: "#F2F3F7",
   card: "#FFFFFF",
@@ -85,6 +86,10 @@ const C = {
   aria: "#8B5CF6",
   ariaSoft: "#F1ECFE",
 };
+// `C` is shadowed inside Home() by `useC()` so all JSX consuming it switches
+// light/dark automatically. The default above is only used by `StyleSheet`
+// definitions at module-load time (those serve as the light-mode baseline).
+const C = C_default;
 
 const BACKEND = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 const AVATARS = {
@@ -313,6 +318,12 @@ export default function Home() {
   const { t, tArr, lang, setLang, langName } = useI18n();
   const { isDemo, enableDemo, refreshTick } = useDemo();
   const auth = useAuth();
+  // Pull the theme-aware palette. Shadows the module-level `C_default`/`C`
+  // for every JSX-inline style consumer in this component, giving us
+  // dark-mode + system-follow behaviour everywhere `C.xxx` is read inline.
+  // (Pre-baked styles from StyleSheet.create still use the light defaults.)
+  const C = useC();
+  const { resolved: themeMode } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [selectedAvatar, setSelectedAvatar] = useState<"maya" | "sofia" | "aria">("sofia");
 
@@ -673,7 +684,7 @@ export default function Home() {
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
         {/* Top Bar */}
         <View style={styles.topBar}>
-          <View style={styles.brandRow}>
+          <View style={[styles.brandRow, { flex: 1 }]}>
             <View style={styles.logoMark}>
               <LinearGradient
                 colors={["#5B5FE9", "#8B5CF6"]}
@@ -683,12 +694,15 @@ export default function Home() {
               />
               <Text style={styles.logoLetter}>r</Text>
             </View>
-            <Text style={styles.brandText}>revolo<Text style={{ color: C.primary }}>ai</Text></Text>
+            <Text style={[styles.brandText, { color: C.text }]}>revolo<Text style={{ color: C.primary }}>ai</Text></Text>
           </View>
-          <PressableCard testID="install-btn" onPress={handleInstall} style={styles.installBtn}>
-            <Ionicons name="phone-portrait-outline" size={14} color={C.text} />
-            <Text style={styles.installBtnText}>{t("home.install")}</Text>
-          </PressableCard>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ThemeToggle />
+            <PressableCard testID="install-btn" onPress={handleInstall} style={[styles.installBtn, { backgroundColor: C.bgSoft, borderColor: C.border }]}>
+              <Ionicons name="phone-portrait-outline" size={14} color={C.text} />
+              <Text style={[styles.installBtnText, { color: C.text }]}>{t("home.install")}</Text>
+            </PressableCard>
+          </View>
         </View>
 
         <ScrollView

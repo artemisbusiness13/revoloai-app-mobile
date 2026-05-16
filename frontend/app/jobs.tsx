@@ -7,6 +7,7 @@ import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { useC, ThemeToggle, JobCardSkeleton } from "../components/ui";
 
 type Job = {
   id: string;
@@ -32,6 +33,7 @@ export default function JobsScreen() {
   const meta = AVATAR_META[key];
   const { t } = useI18n();
   const { user, ready: authReady } = useAuth();
+  const C = useC();
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [profile, setProfile] = useState<any>(null);
@@ -158,30 +160,33 @@ export default function JobsScreen() {
   };
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: C.bg }]}>
       <Stack.Screen options={{ headerShown: false }} />
       <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-        <View style={s.header}>
+        <View style={[s.header, { backgroundColor: C.card, borderBottomColor: C.border }]}>
           <Pressable testID="jobs-back" onPress={() => router.back()} style={s.iconBtn} hitSlop={10}>
-            <Ionicons name="chevron-back" size={22} color="#0B0F19" />
+            <Ionicons name="chevron-back" size={22} color={C.text} />
           </Pressable>
           <View style={[s.avatarRing, { borderColor: meta.color }]}>
             <Avatar uri={AVATARS[key]} size={36} />
           </View>
           <View style={{ flex: 1, marginLeft: 10 }}>
-            <Text style={s.hTitle}>{t("jobs.title")}</Text>
-            <Text style={s.hSub}>{profile?.target_role ? t("jobs.forRole", { role: profile.target_role }) : t("jobs.topPicks")}</Text>
+            <Text style={[s.hTitle, { color: C.text }]}>{t("jobs.title")}</Text>
+            <Text style={[s.hSub, { color: C.text2 }]}>{profile?.target_role ? t("jobs.forRole", { role: profile.target_role }) : t("jobs.topPicks")}</Text>
           </View>
+          <ThemeToggle />
           <Pressable testID="jobs-refresh" onPress={load} style={s.iconBtn} hitSlop={10}>
-            <Ionicons name="refresh" size={20} color="#5B6577" />
+            <Ionicons name="refresh" size={20} color={C.text2} />
           </Pressable>
         </View>
 
         {loading ? (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-            <ActivityIndicator color={meta.color} />
-            <Text style={{ marginTop: 8, color: "#5B6577" }}>{t("jobs.searching")}</Text>
-          </View>
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
+            <JobCardSkeleton />
+            <JobCardSkeleton />
+            <JobCardSkeleton />
+            <JobCardSkeleton />
+          </ScrollView>
         ) : (
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 12 }}>
             {/* Demo-mode banner — shows when the backend is NOT configured for
@@ -221,14 +226,14 @@ export default function JobsScreen() {
               </View>
             ) : null}
             {jobs.map((j) => (
-              <View key={j.id} testID={`job-${j.id}`} style={s.card}>
+              <View key={j.id} testID={`job-${j.id}`} style={[s.card, { backgroundColor: C.card, borderColor: C.border, borderWidth: 1 }]}>
                 <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                   <View style={[s.scoreCircle, { backgroundColor: scoreBg(j.match_score) }]}>
                     <Text style={[s.scoreText, { color: scoreFg(j.match_score) }]}>{j.match_score}</Text>
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
-                    <Text style={s.title}>{j.title}</Text>
-                    <Text style={s.sub}>{[j.company, j.location].filter(Boolean).join(" · ")}</Text>
+                    <Text style={[s.title, { color: C.text }]}>{j.title}</Text>
+                    <Text style={[s.sub, { color: C.text2 }]}>{[j.company, j.location].filter(Boolean).join(" · ")}</Text>
                   </View>
                 </View>
                 <View style={s.metaRow}>

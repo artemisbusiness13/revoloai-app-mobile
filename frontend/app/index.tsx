@@ -30,7 +30,7 @@ import {
 import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
 import { useAuth } from "../lib/auth";
-import { useC, ThemeToggle, useTheme } from "../components/ui";
+import { useC, ThemeToggle, useTheme, CopyrightFooter } from "../components/ui";
 
 /* Cross-platform circular avatar image (uses raw <img> on web for reliable rendering) */
 function Avatar({
@@ -1272,6 +1272,7 @@ export default function Home() {
             </View>
             <Text style={styles.footerCopy}>{t("footer.copy", { year: new Date().getFullYear() })}</Text>
           </View>
+          <CopyrightFooter />
         </ScrollView>
 
         {/* STICKY BOTTOM BAR */}

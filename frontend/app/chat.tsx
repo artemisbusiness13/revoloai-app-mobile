@@ -18,7 +18,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Avatar } from "../components/Avatar";
-import { useC, ThemeToggle, AvatarBubbleSkeleton } from "../components/ui";
+import { useC, ThemeToggle, AvatarBubbleSkeleton, AIContentBadge, CopyrightFooter } from "../components/ui";
 import {
   AVATARS,
   AVATAR_META,
@@ -472,6 +472,7 @@ export default function ChatScreen() {
                   >
                     {m.content}
                   </Text>
+                  {m.role !== "user" ? <AIContentBadge tone={C.text3} /> : null}
                 </View>
                 {/* Inline "Find jobs" CTA — only under Maya AI messages that
                    suggest starting the job search, rendered once (latest match). */}

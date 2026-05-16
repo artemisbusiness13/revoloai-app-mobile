@@ -30,13 +30,15 @@ export type Translations = {
   };
   demo: Record<string, string>;
   profile: Record<string, string>;
-  legal: Record<
-    "privacy" | "terms" | "cookies" | "deletion",
-    {
-      title: string;
-      updated: string;
-      intro: string;
-      sections: { h: string; p: string }[];
-    }
-  >;
+  legal: {
+    privacy: { title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
+    terms:   { title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
+    cookies: { title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
+    deletion:{ title: string; updated: string; intro: string; sections: { h: string; p: string }[] };
+    // Additional namespaces used by the T&C / IP compliance components.
+    tcGate?:      Record<string, string>;
+    serviceInfo?: Record<string, string>;
+    disclaimers?: Record<string, string>;
+    footer?:      Record<string, string>;
+  };
 };

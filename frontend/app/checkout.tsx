@@ -27,6 +27,9 @@ import {
 } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
+import { ServiceInfoModal } from "../components/ui/ServiceInfoModal";
+import { CopyrightFooter } from "../components/ui/CopyrightFooter";
+import { recordPurchaseAcceptance } from "../lib/useTermsAcceptance";
 
 export default function CheckoutScreen() {
   const { t } = useI18n();
@@ -52,6 +55,7 @@ export default function CheckoutScreen() {
   const [paying, setPaying] = useState(false);
   const [done, setDone] = useState(false);
   const [pollSession, setPollSession] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
 
   // Guard: require logged-in user with email BEFORE allowing any payment action.
@@ -118,9 +122,11 @@ export default function CheckoutScreen() {
     };
   }, [pollSession]);
 
-  const pay = async () => {
+  // pay() is now a gate: it validates auth, then opens the ServiceInfoModal.
+  // The actual Stripe redirect lives in doPay(), invoked by the modal's
+  // "Continue to payment" button after the user accepts the disclosures.
+  const pay = () => {
     if (paying || done) return;
-    // Hard gate: must be logged in with email. Surfaced to user.
     if (!user || !user.email) {
       const msg = t("checkout.loginRequired");
       if (Platform.OS === "web") {
@@ -135,6 +141,28 @@ export default function CheckoutScreen() {
       Alert.alert(t("checkout.paypalSoonTitle"), t("checkout.paypalSoonMsg"));
       return;
     }
+    // Open the pre-purchase information modal — required by UK consumer law.
+    setShowInfo(true);
+  };
+
+  const doPay = async () => {
+    if (paying || done) return;
+    // Hard gate: must be logged in with email. Surfaced to user.
+    if (!user || !user.email) {
+      const msg = t("checkout.loginRequired");
+      if (Platform.OS === "web") {
+        try { window.alert(msg); } catch {}
+      } else {
+        Alert.alert(t("checkout.loginRequiredTitle"), msg);
+      }
+      router.replace({ pathname: "/", params: { signin: "1" } });
+      return;
+    }
+    setShowInfo(false);
+    // Record the per-purchase legal acceptance locally (T&C version + service
+    // id + timestamp) — fulfils GDPR audit requirement without a new backend
+    // endpoint.
+    recordPurchaseAcceptance({ service: item.id, userId: user.user_id }).catch(() => {});
     setPaying(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     try {
@@ -262,7 +290,30 @@ export default function CheckoutScreen() {
             <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
             <Text style={styles.secureText}>{t("checkout.secure")}</Text>
           </View>
+          <CopyrightFooter compact />
         </ScrollView>
+
+        {/* Pre-purchase info modal — opens before any Stripe redirect */}
+        <ServiceInfoModal
+          visible={showInfo}
+          onClose={() => setShowInfo(false)}
+          onContinue={doPay}
+          serviceTitle={item.title}
+          serviceId={item.id}
+          whatYouGet={item.bullets.length ? item.bullets : [item.title]}
+          howItWorks={[
+            t("legal.serviceInfo.howStep1") !== "legal.serviceInfo.howStep1"
+              ? t("legal.serviceInfo.howStep1")
+              : "Secure payment via Stripe",
+            t("legal.serviceInfo.howStep2") !== "legal.serviceInfo.howStep2"
+              ? t("legal.serviceInfo.howStep2")
+              : "Instant access after payment confirmation",
+            t("legal.serviceInfo.howStep3") !== "legal.serviceInfo.howStep3"
+              ? t("legal.serviceInfo.howStep3")
+              : "Start chatting with your AI avatar straight away",
+          ]}
+          estimatedTime={item.kind === "interview" ? "20–30 min" : item.kind === "review" ? "5–10 min" : undefined}
+        />
 
         {/* Pay button / success */}
         <View style={styles.bottom}>

@@ -7,7 +7,7 @@ import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, AvatarKey, api, getOrCreateUserId } from "../lib/api";
 import { useI18n } from "../lib/i18n";
 import { useAuth } from "../lib/auth";
-import { useC, ThemeToggle, JobCardSkeleton } from "../components/ui";
+import { useC, ThemeToggle, JobCardSkeleton, CopyrightFooter } from "../components/ui";
 
 type Job = {
   id: string;
@@ -291,6 +291,7 @@ export default function JobsScreen() {
                 </View>
               </View>
             ))}
+            <CopyrightFooter compact />
           </ScrollView>
         )}
       </SafeAreaView>

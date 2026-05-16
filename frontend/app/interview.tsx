@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "../components/Avatar";
 import { AVATARS, AVATAR_META, api, getOrCreateUserId } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { CopyrightFooter } from "../components/ui";
 
 const C_SOFIA = "#EC4899";
 
@@ -143,6 +144,7 @@ export default function InterviewScreen() {
                 </View>
               </View>
             )}
+            <CopyrightFooter compact />
           </ScrollView>
 
           <View style={st.bottom}>

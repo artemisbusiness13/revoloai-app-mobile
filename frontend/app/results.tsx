@@ -7,6 +7,7 @@ import Svg, { Polygon, Polyline, Circle, Text as SvgText, Line } from "react-nat
 import { Avatar } from "../components/Avatar";
 import { AVATARS, api } from "../lib/api";
 import { useI18n } from "../lib/i18n";
+import { CopyrightFooter } from "../components/ui";
 
 const SOFIA = "#EC4899";
 const AXES = [
@@ -129,6 +130,7 @@ export default function ResultsScreen() {
               <Text style={st.primaryBtnText}>{t("common.done")}</Text>
               <Ionicons name="arrow-forward" size={16} color="#fff" />
             </Pressable>
+            <CopyrightFooter compact />
           </ScrollView>
         )}
       </SafeAreaView>

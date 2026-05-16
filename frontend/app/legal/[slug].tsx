@@ -4,8 +4,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useI18n, getDict } from "../../lib/i18n";
+import { CopyrightFooter } from "../../components/ui";
+import { COPYRIGHT_CONTENT } from "../../lib/legalContent";
 
-const VALID = ["privacy", "terms", "cookies", "deletion"] as const;
+const VALID = ["privacy", "terms", "cookies", "deletion", "copyright"] as const;
 type Slug = (typeof VALID)[number];
 
 export default function LegalScreen() {
@@ -14,10 +16,14 @@ export default function LegalScreen() {
   const slug = (VALID.includes(params.slug as Slug) ? (params.slug as Slug) : "privacy") as Slug;
 
   // Read the section list directly from the dictionary (typed) so we don't
-  // need a `tArr` helper for nested objects.
+  // need a `tArr` helper for nested objects. Copyright uses the static
+  // English IP content from legalContent until per-locale copies are added.
   const page = useMemo(() => {
+    if (slug === "copyright") {
+      return { ...COPYRIGHT_CONTENT, updated: "© " + new Date().getFullYear() };
+    }
     const dict = getDict(lang as any);
-    return dict.legal[slug];
+    return dict.legal[slug as Exclude<Slug, "copyright">];
   }, [lang, slug]);
 
   return (
@@ -56,7 +62,7 @@ export default function LegalScreen() {
 
           {/* Quick links to other legal pages */}
           <View style={st.linksRow}>
-            {VALID.filter((v) => v !== slug).map((v) => (
+            {VALID.filter((v) => v !== slug && v !== "copyright").map((v) => (
               <Pressable
                 key={v}
                 testID={`legal-link-${v}`}
@@ -67,6 +73,7 @@ export default function LegalScreen() {
               </Pressable>
             ))}
           </View>
+          <CopyrightFooter compact />
         </ScrollView>
       </SafeAreaView>
     </View>

@@ -815,3 +815,37 @@ agent_communication:
         • Optionally reinforce "no markdown bold/asterisks" — Maya keeps using ** for emphasis.
 
         Test artefact: /app/profile_me_test.py
+
+    - agent: "main"
+      message: |
+        Legal & T&C compliance integration complete (frontend-only, no backend changes).
+
+        WHAT WAS WIRED:
+        1) `<TermsAcceptanceGate />` mounted in `/app/frontend/app/_layout.tsx` — shows on first visit, blocks UI until user scrolls to bottom + ticks both T&C and Privacy checkboxes. Persisted via AsyncStorage with version (`revolo.tc.accepted` / `revolo.tc.version=1.0`); re-prompts on version bump.
+        2) `<ServiceInfoModal />` wired into `/app/frontend/app/checkout.tsx`. The Pay button now opens this modal first; only after both required checkboxes ("I understand AI is non-guaranteed" + "I agree to Terms/Privacy/Refund") does `Continue to payment` trigger the Stripe checkout (`doPay`). On continue, `recordPurchaseAcceptance({service, userId})` writes a per-purchase audit row to AsyncStorage (T&C version + service id + ISO timestamp) — fulfils GDPR record-keeping without a new backend route.
+        3) `<CopyrightFooter />` added to home (`index.tsx`, full variant) and to bottom of every other screen (chat, jobs, interview, results, profile, legal/[slug] — compact variant). Uses translated strings.
+        4) `<AIContentBadge />` added under every Maya/Sofia/Aria AI bubble in `chat.tsx` ("AI-generated · © Revoloai").
+        5) `legal/[slug]` extended to support `slug=copyright` rendering `COPYRIGHT_CONTENT` from `lib/legalContent.ts`.
+
+        TRANSLATIONS:
+        - Extended `Translations.legal` type to permit optional `tcGate`, `serviceInfo`, `disclaimers`, `footer` namespaces.
+        - Added all keys to all 6 locales: en, ro, pl, es, pa, ur. Footer uses {year} placeholder.
+
+        CONSTRAINTS HONOURED:
+        - Did NOT touch Stripe checkout flow, Adzuna integration, or Claude/LLM prompts.
+        - Did NOT overwrite `/app/backend/.env` (Adzuna creds preserved).
+        - Did NOT install moti / framer-motion. Used existing `react-native-reanimated`.
+        - Used existing `useC()` / Aurora design tokens; no Tailwind.
+
+        VERIFIED VIA SCREENSHOTS:
+        ✅ T&C gate appears on first load (mobile 390x844). Scroll-to-end gate works. Checkboxes toggle. Accept button enables only when all 3 conditions met.
+        ✅ Home page displays the long Copyright notice + "View full copyright notice" link.
+        ✅ Checkout shows compact CopyrightFooter at bottom.
+        ✅ Pay button now opens ServiceInfoModal with 4 sections (whatYouGet / howItWorks / disclaimers / refundPolicy) and 2 required checkboxes; Continue is disabled until both are checked.
+
+        TEST CREDENTIALS UPDATED:
+        - `/app/memory/test_credentials.md` updated. Active user: `qa+legal@revoloai.com` / `Password123!` (user_id `u_7efaaa98986d4e`).
+        - Old `test@revoloai.com` exists in DB but password no longer matches — moved to legacy section.
+
+        NO BACKEND TESTING NEEDED for this change (frontend-only, no API surface modified).
+        FRONTEND TESTING — pending user permission. The changes touch the gate/modal/footer flows only; existing flows unchanged. Will not run `expo_frontend_testing_agent` until the user explicitly approves.

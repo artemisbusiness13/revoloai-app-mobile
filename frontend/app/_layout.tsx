@@ -7,6 +7,7 @@ import { DemoProvider } from "../lib/demo";
 import { AuthProvider } from "../lib/auth";
 import DemoLauncher from "../components/DemoLauncher";
 import { ThemeProvider, useTheme } from "../components/ui";
+import { TermsAcceptanceGate } from "../components/ui/TermsAcceptanceGate";
 
 /**
  * Inner layout that reads the resolved theme so the global Stack background
@@ -46,6 +47,7 @@ export default function RootLayout() {
             <AuthProvider>
               <DemoProvider>
                 <ThemedStack />
+                <TermsAcceptanceGate />
                 <DemoLauncher />
               </DemoProvider>
             </AuthProvider>

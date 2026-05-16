@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useC } from "./ThemeProvider";
 import { space } from "./theme";
+import { useI18n } from "../../lib/i18n";
 
 /**
  * Global copyright notice for the bottom of every screen footer.
@@ -11,10 +12,11 @@ import { space } from "./theme";
  */
 export function CopyrightFooter({ compact = false }: { compact?: boolean }) {
   const C = useC();
+  const { t } = useI18n();
   const year = new Date().getFullYear();
   const text = compact
-    ? `© ${year} Revoloai. All rights reserved.`
-    : `© ${year} Revoloai. All rights reserved. AI-generated content, including job suggestions, interview questions, and career advice, is the intellectual property of Revoloai and licensed for personal use only. Redistribution, scraping, or commercial reuse is prohibited.`;
+    ? t("legal.footer.copyright", { year })
+    : t("legal.footer.copyrightLong", { year });
   return (
     <View style={{ paddingVertical: space.md, paddingHorizontal: space.lg }}>
       <Text style={{ color: C.text3, fontSize: 11, lineHeight: 16, textAlign: "center" }}>
@@ -26,7 +28,9 @@ export function CopyrightFooter({ compact = false }: { compact?: boolean }) {
         accessibilityRole="link"
         style={{ alignSelf: "center", marginTop: 4 }}
       >
-        <Text style={{ color: C.primary, fontSize: 11, fontWeight: "700", textDecorationLine: "underline" }}>View full copyright notice</Text>
+        <Text style={{ color: C.primary, fontSize: 11, fontWeight: "700", textDecorationLine: "underline" }}>
+          {t("legal.footer.viewFull")}
+        </Text>
       </Pressable>
     </View>
   );

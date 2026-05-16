@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { api } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { useI18n } from "../lib/i18n";
+import { CopyrightFooter } from "../components/ui";
 
 const C = {
   bg: "#FAFAFB", card: "#FFFFFF", text: "#0B0F19", text2: "#5B6577", text3: "#8A93A6",
@@ -161,6 +162,7 @@ export default function ProfileScreen() {
             </>
           )}
           {error ? <Text style={s.err}>{error}</Text> : null}
+          <CopyrightFooter compact />
         </ScrollView>
       )}
 

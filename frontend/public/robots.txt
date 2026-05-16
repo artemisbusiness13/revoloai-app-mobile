@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Critical assets must be crawlable so social-card / search-preview crawlers
+# can fetch the brand mark and OG image.
+Allow: /icons/
+Allow: /og-image.png
+Allow: /og-image-square.png
+Allow: /favicon.ico
+Allow: /manifest.json
+
+# Internal API + service worker plumbing — not useful for indexing.
+Disallow: /api/
+
+Sitemap: https://revoloai.com/sitemap.xml

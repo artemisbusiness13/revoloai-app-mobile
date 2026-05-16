@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useAuth } from "../../lib/auth";
 import { useTermsAcceptance } from "../../lib/useTermsAcceptance";
 import { TermsAcceptanceGate } from "./TermsAcceptanceGate";
@@ -23,21 +23,6 @@ export function PostAuthTermsGuard() {
   const auth = useAuth();
   const tc = useTermsAcceptance();
 
-  // Diagnostics — fire whenever any of the deciding inputs change so we can
-  // confirm in the browser console that the guard is evaluating correctly.
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log("[T&C guard] eval", {
-      authReady: auth.ready,
-      tcReady: tc.ready,
-      userId: auth.user?.user_id || null,
-      isAuthed: !!auth.user,
-      tcAccepted: tc.accepted,
-      tcVersion: tc.version,
-      willShowGate: !!(auth.ready && tc.ready && auth.user && !tc.accepted),
-    });
-  }, [auth.ready, tc.ready, auth.user, tc.accepted, tc.version]);
-
   // Wait for both providers to finish loading from AsyncStorage before
   // deciding — avoids a flash where `tc.accepted` is briefly false and the
   // gate appears for an already-accepted user.
@@ -53,13 +38,9 @@ export function PostAuthTermsGuard() {
     <TermsAcceptanceGate
       visible
       onAccept={() => {
-        // eslint-disable-next-line no-console
-        console.log("[T&C guard] accepted by", auth.user?.email);
         // Gate self-hides via tc.accepted flipping to true.
       }}
       onDecline={() => {
-        // eslint-disable-next-line no-console
-        console.log("[T&C guard] declined → logging out", auth.user?.email);
         // Decline → log out so the user returns to anonymous home and is
         // blocked from /profile, /checkout, /jobs, /chat until they re-signup
         // and accept.

@@ -31,8 +31,6 @@ import { useI18n, SUPPORTED_LANGS, type LangCode } from "../lib/i18n";
 import { useDemo } from "../lib/demo";
 import { useAuth } from "../lib/auth";
 import { useC, ThemeToggle, useTheme, CopyrightFooter } from "../components/ui";
-import { TermsAcceptanceGate } from "../components/ui/TermsAcceptanceGate";
-import { useTermsAcceptance } from "../lib/useTermsAcceptance";
 import { TC_VERSION } from "../lib/legalContent";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -438,13 +436,6 @@ export default function Home() {
   const [signInPwd, setSignInPwd] = useState("");
   const [signInBusy, setSignInBusy] = useState(false);
   const [signInErr, setSignInErr] = useState<string | null>(null);
-
-  // Terms & Conditions — moved out of first-launch and into the post-signup flow.
-  // After a successful signup, we check the user's existing acceptance: if they
-  // already accepted, we go straight to /profile; otherwise we open the gate and
-  // only push to /profile once they accept. Login flow is unchanged.
-  const tc = useTermsAcceptance();
-  const [tcGateOpen, setTcGateOpen] = useState(false);
   // Open the signin modal when redirected here with ?signin=1 (e.g. from
   // /checkout when the user is not logged in).
   const homeParams = useLocalSearchParams<{ signin?: string; paid?: string }>();
@@ -672,8 +663,13 @@ export default function Home() {
         setSignInName(""); setSignInEmail(""); setSignInPwd("");
         if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
 
-        // Diagnostics — confirm storage state at decision time (read directly
-        // from AsyncStorage to bypass any stale React state).
+        // Read T&C acceptance directly from AsyncStorage at decision time so
+        // we don't rely on potentially stale React state. If the current
+        // version is already accepted on this device, skip straight to the
+        // profile form. Otherwise we still push to /profile — the global
+        // <PostAuthTermsGuard /> will overlay the T&C modal because the user
+        // is now authed and tcAccepted=false, blocking interaction with the
+        // profile until they accept.
         let storedOk: string | null = null;
         let storedVer: string | null = null;
         try {
@@ -681,29 +677,12 @@ export default function Home() {
           storedVer = await AsyncStorage.getItem("revolo.tc.version");
         } catch {}
         const acceptedNow = storedOk === "true" && storedVer === TC_VERSION;
-        // eslint-disable-next-line no-console
-        console.log("[signup] success", {
-          email: signInEmail.trim(),
-          tcAcceptedHook: tc.accepted,
-          tcAcceptedStorage: acceptedNow,
-          storedOk, storedVer, currentVersion: TC_VERSION,
-          tcGateOpen,
-        });
-
-        // If T&C for current version is already accepted on this device,
-        // skip the gate and go to profile onboarding.
-        // Otherwise: leave navigation alone — the global <PostAuthTermsGuard />
-        // will immediately overlay the T&C modal because user is now authed
-        // and tc.accepted is false. After they accept, they can proceed.
+        // Note: navigation is the same in either branch — the guard handles
+        // the modal overlay. Kept as an explicit conditional in case future
+        // requirements diverge between the two paths.
         if (acceptedNow) {
-          // eslint-disable-next-line no-console
-          console.log("[signup] nav target: /profile (T&C already accepted)");
           router.push("/profile");
         } else {
-          // eslint-disable-next-line no-console
-          console.log("[signup] nav target: stay on home; PostAuthTermsGuard will open T&C");
-          // We DO push to /profile but the gate will overlay immediately and
-          // block interaction. On accept the gate hides and profile is ready.
           router.push("/profile");
         }
       } else {

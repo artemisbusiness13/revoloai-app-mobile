@@ -169,8 +169,34 @@ function PressableCard({
   testID?: string;
 }) {
   const { scale, onPressIn, onPressOut } = usePressScale();
+  // Flatten the incoming style so layout-affecting props (width, flex, margin)
+  // can also live on the outer Animated.View — otherwise a child width: "32%"
+  // gets applied only to the inner Pressable and the parent flex row treats
+  // the card as content-sized, which collapses the column on desktop.
+  const flat = StyleSheet.flatten(style) || {};
+  const outerStyle: any = { transform: [{ scale }] };
+  const layoutKeys = [
+    "width",
+    "minWidth",
+    "maxWidth",
+    "flex",
+    "flexBasis",
+    "flexGrow",
+    "flexShrink",
+    "alignSelf",
+    "marginTop",
+    "marginBottom",
+    "marginLeft",
+    "marginRight",
+    "marginHorizontal",
+    "marginVertical",
+    "margin",
+  ] as const;
+  for (const k of layoutKeys) {
+    if (flat[k] !== undefined) outerStyle[k] = flat[k];
+  }
   return (
-    <Animated.View style={{ transform: [{ scale }] }}>
+    <Animated.View style={outerStyle}>
       <Pressable
         testID={testID}
         onPress={onPress}
@@ -197,7 +223,7 @@ type Plan = {
   avatar: "maya" | "sofia" | "aria";
 };
 
-function ServiceCard({ plan, idx, onPress }: { plan: Plan; idx: number; onPress: (p: Plan) => void }) {
+function ServiceCard({ plan, idx, onPress, isDesktop }: { plan: Plan; idx: number; onPress: (p: Plan) => void; isDesktop?: boolean }) {
   const { t } = useI18n();
   const isFeatured = !!plan.badge;
   return (
@@ -211,6 +237,7 @@ function ServiceCard({ plan, idx, onPress }: { plan: Plan; idx: number; onPress:
           borderWidth: 1.5,
           shadowOpacity: 0.12,
         },
+        isDesktop && styles.serviceCardDesktop,
       ]}
     >
       <View style={styles.serviceTop}>
@@ -305,6 +332,7 @@ function TrustCard({
   bg,
   testID,
   onPress,
+  isDesktop,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   title: string;
@@ -314,9 +342,10 @@ function TrustCard({
   bg: string;
   testID?: string;
   onPress?: () => void;
+  isDesktop?: boolean;
 }) {
   return (
-    <PressableCard testID={testID} onPress={onPress} style={[styles.trustCard]}>
+    <PressableCard testID={testID} onPress={onPress} style={[styles.trustCard, isDesktop && styles.trustCardDesktop]}>
       <View style={[styles.trustIcon, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={18} color={color} />
       </View>
@@ -1064,8 +1093,8 @@ export default function Home() {
           </View>
 
           {/* LANGUAGE SELECTOR */}
-          <View style={styles.section}>
-            <View style={[styles.langCard, { backgroundColor: C.card, borderColor: C.border }]}>
+          <View style={[styles.section, isDesktop && styles.sectionDesktop]}>
+            <View style={[styles.langCard, { backgroundColor: C.card, borderColor: C.border }, isDesktop && styles.langCardDesktop]}>
               <View style={styles.langHeader}>
                 <View style={[styles.langIcon, { backgroundColor: C.primarySoft }]}>
                   <Ionicons name="globe-outline" size={16} color={C.primary} />
@@ -1098,6 +1127,7 @@ export default function Home() {
                       hitSlop={4}
                       style={({ pressed }) => [
                         styles.langTile,
+                        isDesktop && styles.langTileDesktop,
                         {
                           backgroundColor: active ? C.primary : C.bgSoft,
                           borderColor: active ? C.primary : C.border,
@@ -1141,7 +1171,7 @@ export default function Home() {
           <View style={styles.section}>
             <SectionLabel label={t("trust.label")} color={C.emerald} />
             <SectionTitle>{t("trust.title")}</SectionTitle>
-            <View style={styles.trustGrid}>
+            <View style={[styles.trustGrid, isDesktop && styles.trustGridDesktop]}>
               <TrustCard
                 testID="trust-privacy" onPress={() => openTrust("privacy")}
                 icon="shield-checkmark-outline"
@@ -1150,6 +1180,7 @@ export default function Home() {
                 cta={t("trust.privacyCta")}
                 color={C.primary}
                 bg={C.primarySoft}
+                isDesktop={isDesktop}
               />
               <TrustCard
                 testID="trust-deletion" onPress={() => openTrust("deletion")}
@@ -1159,6 +1190,7 @@ export default function Home() {
                 cta={t("trust.deletionCta")}
                 color={C.sofia}
                 bg={C.sofiaSoft}
+                isDesktop={isDesktop}
               />
               <TrustCard
                 testID="trust-payments" onPress={() => openTrust("payments")}
@@ -1168,6 +1200,7 @@ export default function Home() {
                 cta={t("trust.paymentsCta")}
                 color={C.emerald}
                 bg={C.emeraldSoft}
+                isDesktop={isDesktop}
               />
               <TrustCard
                 testID="trust-honest" onPress={() => openTrust("honest")}
@@ -1177,6 +1210,7 @@ export default function Home() {
                 cta={t("trust.honestCta")}
                 color={C.aria}
                 bg={C.ariaSoft}
+                isDesktop={isDesktop}
               />
             </View>
             <View style={styles.honestNote}>
@@ -1192,7 +1226,7 @@ export default function Home() {
             <SectionLabel label={t("meetAvatars.label")} color={C.primary} />
             <SectionTitle>{t("meetAvatars.title")}</SectionTitle>
             <SectionSub>{t("meetAvatars.sub")}</SectionSub>
-            <View style={styles.avatarRow}>
+            <View style={[styles.avatarRow, isDesktop && styles.avatarRowDesktop]}>
               <AvatarChip
                 testID="avatar-maya" onPress={() => openChat("maya")}
                 src={AVATARS.maya}
@@ -1232,9 +1266,9 @@ export default function Home() {
                 <Text style={styles.sectionSub}>{t("services.mayaSub")}</Text>
               </View>
             </View>
-            <View style={styles.plansList}>
+            <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {jobsPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} />
+                <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1251,9 +1285,9 @@ export default function Home() {
                 <Text style={styles.sectionSub}>{t("services.sofiaSub")}</Text>
               </View>
             </View>
-            <View style={styles.plansList}>
+            <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {interviewPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} />
+                <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1270,9 +1304,9 @@ export default function Home() {
                 <Text style={styles.sectionSub}>{t("services.ariaSub")}</Text>
               </View>
             </View>
-            <View style={styles.plansList}>
+            <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {coachPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} />
+                <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1282,9 +1316,9 @@ export default function Home() {
             <SectionLabel label={t("bundles.label")} color={C.amber} />
             <SectionTitle>{t("bundles.title")}</SectionTitle>
             <SectionSub>{t("bundles.sub")}</SectionSub>
-            <View style={{ marginTop: 16, gap: 14 }}>
+            <View style={[{ marginTop: 16, gap: 14 }, isDesktop && styles.bundlesGridDesktop]}>
               {bundles.map((b, i) => (
-                <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={styles.bundleCard}>
+                <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={[styles.bundleCard, isDesktop && styles.bundleCardDesktop]}>
                   <LinearGradient
                     colors={[b.g1, b.g2]}
                     start={{ x: 0, y: 0 }}
@@ -2432,4 +2466,81 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalBtnText: { fontSize: 14, fontWeight: "700" },
+
+  /* ──────────────── Desktop-only compaction overrides ──────────────── */
+  /* Applied via `isDesktop && styles.xDesktop`. Mobile + tablet (<1024px)
+   * never receive these styles, so the native/app feel is preserved. */
+  sectionDesktop: {
+    paddingHorizontal: 40,
+    paddingTop: 28,
+  },
+  langCardDesktop: {
+    padding: 20,
+    borderRadius: 18,
+    // softer, premium drop shadow
+    shadowOpacity: 0.06,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+  langTileDesktop: {
+    width: "31.8%",   // 3-column grid on desktop
+    minHeight: 52,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+  },
+  trustGridDesktop: {
+    marginTop: 14,
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 14,
+  },
+  trustCardDesktop: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    padding: 14,
+    borderRadius: 16,
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  avatarRowDesktop: {
+    marginTop: 16,
+    gap: 14,
+  },
+  plansListDesktop: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 14,
+    alignItems: "stretch",
+  },
+  serviceCardDesktop: {
+    // 3-up flex distribution: each card claims equal share of the row.
+    // `width: "32%"` was unreliable on the Animated.View wrapper, so we rely
+    // on flexBasis 0 + flexGrow 1 which RN-Web honors consistently.
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    padding: 16,
+    borderRadius: 18,
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  bundlesGridDesktop: {
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    gap: 14,
+    alignItems: "stretch",
+  },
+  bundleCardDesktop: {
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    padding: 18,
+    borderRadius: 20,
+  },
 });

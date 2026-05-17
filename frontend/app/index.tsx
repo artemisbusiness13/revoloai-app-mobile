@@ -1248,13 +1248,7 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {jobsPlans.map((p, i) => (
-                isDesktop ? (
-                  <View key={p.title} style={styles.gridCellDesktop}>
-                    <ServiceCard plan={p} idx={i} onPress={openCheckout} isDesktop />
-                  </View>
-                ) : (
-                  <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} />
-                )
+                <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1273,13 +1267,7 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {interviewPlans.map((p, i) => (
-                isDesktop ? (
-                  <View key={p.title} style={styles.gridCellDesktop}>
-                    <ServiceCard plan={p} idx={i + 10} onPress={openCheckout} isDesktop />
-                  </View>
-                ) : (
-                  <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} />
-                )
+                <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1298,13 +1286,7 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {coachPlans.map((p, i) => (
-                isDesktop ? (
-                  <View key={p.title} style={styles.gridCellDesktop}>
-                    <ServiceCard plan={p} idx={i + 20} onPress={openCheckout} isDesktop />
-                  </View>
-                ) : (
-                  <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} />
-                )
+                <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} isDesktop={isDesktop} />
               ))}
             </View>
           </View>
@@ -1315,43 +1297,36 @@ export default function Home() {
             <SectionTitle>{t("bundles.title")}</SectionTitle>
             <SectionSub>{t("bundles.sub")}</SectionSub>
             <View style={[{ marginTop: 16, gap: 14 }, isDesktop && styles.bundlesGridDesktop]}>
-              {bundles.map((b, i) => {
-                const card = (
-                  <PressableCard testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={[styles.bundleCard, isDesktop && styles.bundleCardDesktop]}>
-                    <LinearGradient
-                      colors={[b.g1, b.g2]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={StyleSheet.absoluteFill}
-                    />
-                    <View style={styles.bundleBadge}>
-                      <Text style={styles.bundleBadgeText}>{b.save}</Text>
-                    </View>
-                    <Text style={styles.bundleTitle}>{b.title}</Text>
-                    <Text style={styles.bundleDesc}>{b.desc}</Text>
-                    <View style={{ marginTop: 14, gap: 8 }}>
-                      {b.bullets.map((bb, ii) => (
-                        <View key={ii} style={styles.bundleBullet}>
-                          <Ionicons name="checkmark-circle" size={14} color="#fff" />
-                          <Text style={styles.bundleBulletText}>{bb}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={styles.bundleFooter}>
-                      <Text style={styles.bundlePrice}>{b.price}</Text>
-                      <View style={styles.bundleCta}>
-                        <Text style={styles.bundleCtaText}>{t("bundles.unlock")}</Text>
-                        <Ionicons name="arrow-forward" size={14} color={b.g1} />
+              {bundles.map((b, i) => (
+                <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={[styles.bundleCard, isDesktop && styles.bundleCardDesktop]}>
+                  <LinearGradient
+                    colors={[b.g1, b.g2]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                  <View style={styles.bundleBadge}>
+                    <Text style={styles.bundleBadgeText}>{b.save}</Text>
+                  </View>
+                  <Text style={styles.bundleTitle}>{b.title}</Text>
+                  <Text style={styles.bundleDesc}>{b.desc}</Text>
+                  <View style={{ marginTop: 14, gap: 8 }}>
+                    {b.bullets.map((bb, ii) => (
+                      <View key={ii} style={styles.bundleBullet}>
+                        <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                        <Text style={styles.bundleBulletText}>{bb}</Text>
                       </View>
+                    ))}
+                  </View>
+                  <View style={styles.bundleFooter}>
+                    <Text style={styles.bundlePrice}>{b.price}</Text>
+                    <View style={styles.bundleCta}>
+                      <Text style={styles.bundleCtaText}>{t("bundles.unlock")}</Text>
+                      <Ionicons name="arrow-forward" size={14} color={b.g1} />
                     </View>
-                  </PressableCard>
-                );
-                return isDesktop ? (
-                  <View key={b.title} style={styles.gridCellDesktop}>{card}</View>
-                ) : (
-                  <React.Fragment key={b.title}>{card}</React.Fragment>
-                );
-              })}
+                  </View>
+                </PressableCard>
+              ))}
             </View>
           </View>
 
@@ -2472,9 +2447,13 @@ const styles = StyleSheet.create({
   },
   modalBtnText: { fontSize: 14, fontWeight: "700" },
 
-  /* ──────────────── Desktop-only compaction overrides ──────────────── */
-  /* Applied via `isDesktop && styles.xDesktop`. Mobile + tablet (<1024px)
-   * never receive these styles, so the native/app feel is preserved. */
+  /* ──────────────── Desktop-only compaction overrides ────────────────
+   * Applied via `isDesktop && styles.xDesktop`. Mobile + tablet (<1024px)
+   * never receive these styles. NOTE: We deliberately do NOT switch the
+   * plan/bundle/trust grids to a flex-direction:row layout on desktop.
+   * RN-Web has a layout quirk where Pressable inside flex-row collapses
+   * to ~34px regardless of wrappers/widths/flex props. Instead, sections
+   * stay vertically stacked but with denser padding + premium shadows. */
   sectionDesktop: {
     paddingHorizontal: 40,
     paddingTop: 28,
@@ -2482,26 +2461,22 @@ const styles = StyleSheet.create({
   langCardDesktop: {
     padding: 20,
     borderRadius: 18,
-    // softer, premium drop shadow
     shadowOpacity: 0.06,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
   langTileDesktop: {
-    width: "31.8%",   // 3-column grid on desktop
+    width: "31.8%",
     minHeight: 52,
     paddingVertical: 9,
     paddingHorizontal: 12,
   },
   trustGridDesktop: {
     marginTop: 14,
-    flexDirection: "row",
-    flexWrap: "nowrap",
     gap: 14,
   },
   trustCardDesktop: {
-    flex: 1,
-    padding: 14,
+    padding: 18,
     borderRadius: 16,
     shadowOpacity: 0.05,
     shadowRadius: 14,
@@ -2512,41 +2487,20 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   plansListDesktop: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
     gap: 14,
-    alignItems: "stretch",
   },
   serviceCardDesktop: {
-    // Mirror the working pattern of avatarCard (flex:1) so the inner card
-    // stretches inside its outer 32%/flex parent. Combined with the
-    // `gridCellDesktop` wrapper at the call site this gives a clean 3-up
-    // grid with full natural card heights.
-    flex: 1,
-    padding: 16,
+    padding: 18,
     borderRadius: 18,
     shadowOpacity: 0.06,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 6 },
   },
   bundlesGridDesktop: {
-    flexDirection: "row",
-    flexWrap: "nowrap",
     gap: 14,
-    alignItems: "stretch",
   },
   bundleCardDesktop: {
-    flex: 1,
-    padding: 18,
+    padding: 20,
     borderRadius: 20,
-  },
-  /* Desktop 3-up grid cell. Wraps a ServiceCard / bundle card so the OUTER
-   * element (a plain View) holds the width inside a flex row, while the
-   * inner card retains its natural intrinsic height. */
-  gridCellDesktop: {
-    width: "32%",
-  },
-  gridCellTrust: {
-    width: "23.5%",
   },
 });

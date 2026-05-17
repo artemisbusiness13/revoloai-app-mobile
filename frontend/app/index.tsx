@@ -168,45 +168,21 @@ function PressableCard({
   onPress?: () => void;
   testID?: string;
 }) {
-  const { scale, onPressIn, onPressOut } = usePressScale();
-  // Flatten the incoming style so layout-affecting props (width, flex, margin)
-  // can also live on the outer Animated.View — otherwise a child width: "32%"
-  // gets applied only to the inner Pressable and the parent flex row treats
-  // the card as content-sized, which collapses the column on desktop.
-  const flat = StyleSheet.flatten(style) || {};
-  const outerStyle: any = { transform: [{ scale }] };
-  const layoutKeys = [
-    "width",
-    "minWidth",
-    "maxWidth",
-    "flex",
-    "flexBasis",
-    "flexGrow",
-    "flexShrink",
-    "alignSelf",
-    "marginTop",
-    "marginBottom",
-    "marginLeft",
-    "marginRight",
-    "marginHorizontal",
-    "marginVertical",
-    "margin",
-  ] as const;
-  for (const k of layoutKeys) {
-    if (flat[k] !== undefined) outerStyle[k] = flat[k];
-  }
+  const { onPressIn, onPressOut } = usePressScale();
   return (
-    <Animated.View style={outerStyle}>
-      <Pressable
-        testID={testID}
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={style}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      testID={testID}
+      onPress={onPress}
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      style={({ pressed }) => [
+        style,
+        Platform.OS !== "web" && { transform: [{ scale: pressed ? 0.985 : 1 }] },
+        pressed && { opacity: 0.92 },
+      ]}
+    >
+      {children}
+    </Pressable>
   );
 }
 
@@ -344,7 +320,7 @@ function TrustCard({
   onPress?: () => void;
   isDesktop?: boolean;
 }) {
-  return (
+  const card = (
     <PressableCard testID={testID} onPress={onPress} style={[styles.trustCard, isDesktop && styles.trustCardDesktop]}>
       <View style={[styles.trustIcon, { backgroundColor: bg }]}>
         <Ionicons name={icon} size={18} color={color} />
@@ -354,6 +330,10 @@ function TrustCard({
       <Text style={[styles.trustCta, { color }]}>{cta} →</Text>
     </PressableCard>
   );
+  if (isDesktop) {
+    return <View style={styles.gridCellTrust}>{card}</View>;
+  }
+  return card;
 }
 
 /* ---------- Desktop Hero Right Visual ---------- */
@@ -1268,7 +1248,13 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {jobsPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} isDesktop={isDesktop} />
+                isDesktop ? (
+                  <View key={p.title} style={styles.gridCellDesktop}>
+                    <ServiceCard plan={p} idx={i} onPress={openCheckout} isDesktop />
+                  </View>
+                ) : (
+                  <ServiceCard key={p.title} plan={p} idx={i} onPress={openCheckout} />
+                )
               ))}
             </View>
           </View>
@@ -1287,7 +1273,13 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {interviewPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} isDesktop={isDesktop} />
+                isDesktop ? (
+                  <View key={p.title} style={styles.gridCellDesktop}>
+                    <ServiceCard plan={p} idx={i + 10} onPress={openCheckout} isDesktop />
+                  </View>
+                ) : (
+                  <ServiceCard key={p.title} plan={p} idx={i + 10} onPress={openCheckout} />
+                )
               ))}
             </View>
           </View>
@@ -1306,7 +1298,13 @@ export default function Home() {
             </View>
             <View style={[styles.plansList, isDesktop && styles.plansListDesktop]}>
               {coachPlans.map((p, i) => (
-                <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} isDesktop={isDesktop} />
+                isDesktop ? (
+                  <View key={p.title} style={styles.gridCellDesktop}>
+                    <ServiceCard plan={p} idx={i + 20} onPress={openCheckout} isDesktop />
+                  </View>
+                ) : (
+                  <ServiceCard key={p.title} plan={p} idx={i + 20} onPress={openCheckout} />
+                )
               ))}
             </View>
           </View>
@@ -1317,36 +1315,43 @@ export default function Home() {
             <SectionTitle>{t("bundles.title")}</SectionTitle>
             <SectionSub>{t("bundles.sub")}</SectionSub>
             <View style={[{ marginTop: 16, gap: 14 }, isDesktop && styles.bundlesGridDesktop]}>
-              {bundles.map((b, i) => (
-                <PressableCard key={b.title} testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={[styles.bundleCard, isDesktop && styles.bundleCardDesktop]}>
-                  <LinearGradient
-                    colors={[b.g1, b.g2]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <View style={styles.bundleBadge}>
-                    <Text style={styles.bundleBadgeText}>{b.save}</Text>
-                  </View>
-                  <Text style={styles.bundleTitle}>{b.title}</Text>
-                  <Text style={styles.bundleDesc}>{b.desc}</Text>
-                  <View style={{ marginTop: 14, gap: 8 }}>
-                    {b.bullets.map((bb, ii) => (
-                      <View key={ii} style={styles.bundleBullet}>
-                        <Ionicons name="checkmark-circle" size={14} color="#fff" />
-                        <Text style={styles.bundleBulletText}>{bb}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <View style={styles.bundleFooter}>
-                    <Text style={styles.bundlePrice}>{b.price}</Text>
-                    <View style={styles.bundleCta}>
-                      <Text style={styles.bundleCtaText}>{t("bundles.unlock")}</Text>
-                      <Ionicons name="arrow-forward" size={14} color={b.g1} />
+              {bundles.map((b, i) => {
+                const card = (
+                  <PressableCard testID={`bundle-${i}`} onPress={() => openBundleCheckout(b)} style={[styles.bundleCard, isDesktop && styles.bundleCardDesktop]}>
+                    <LinearGradient
+                      colors={[b.g1, b.g2]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.bundleBadge}>
+                      <Text style={styles.bundleBadgeText}>{b.save}</Text>
                     </View>
-                  </View>
-                </PressableCard>
-              ))}
+                    <Text style={styles.bundleTitle}>{b.title}</Text>
+                    <Text style={styles.bundleDesc}>{b.desc}</Text>
+                    <View style={{ marginTop: 14, gap: 8 }}>
+                      {b.bullets.map((bb, ii) => (
+                        <View key={ii} style={styles.bundleBullet}>
+                          <Ionicons name="checkmark-circle" size={14} color="#fff" />
+                          <Text style={styles.bundleBulletText}>{bb}</Text>
+                        </View>
+                      ))}
+                    </View>
+                    <View style={styles.bundleFooter}>
+                      <Text style={styles.bundlePrice}>{b.price}</Text>
+                      <View style={styles.bundleCta}>
+                        <Text style={styles.bundleCtaText}>{t("bundles.unlock")}</Text>
+                        <Ionicons name="arrow-forward" size={14} color={b.g1} />
+                      </View>
+                    </View>
+                  </PressableCard>
+                );
+                return isDesktop ? (
+                  <View key={b.title} style={styles.gridCellDesktop}>{card}</View>
+                ) : (
+                  <React.Fragment key={b.title}>{card}</React.Fragment>
+                );
+              })}
             </View>
           </View>
 
@@ -2495,10 +2500,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   trustCardDesktop: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: 0,
-    minWidth: 0,
+    flex: 1,
     padding: 14,
     borderRadius: 16,
     shadowOpacity: 0.05,
@@ -2516,13 +2518,11 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   serviceCardDesktop: {
-    // 3-up flex distribution: each card claims equal share of the row.
-    // `width: "32%"` was unreliable on the Animated.View wrapper, so we rely
-    // on flexBasis 0 + flexGrow 1 which RN-Web honors consistently.
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: 0,
-    minWidth: 0,
+    // Mirror the working pattern of avatarCard (flex:1) so the inner card
+    // stretches inside its outer 32%/flex parent. Combined with the
+    // `gridCellDesktop` wrapper at the call site this gives a clean 3-up
+    // grid with full natural card heights.
+    flex: 1,
     padding: 16,
     borderRadius: 18,
     shadowOpacity: 0.06,
@@ -2536,11 +2536,17 @@ const styles = StyleSheet.create({
     alignItems: "stretch",
   },
   bundleCardDesktop: {
-    flexGrow: 1,
-    flexShrink: 1,
-    flexBasis: 0,
-    minWidth: 0,
+    flex: 1,
     padding: 18,
     borderRadius: 20,
+  },
+  /* Desktop 3-up grid cell. Wraps a ServiceCard / bundle card so the OUTER
+   * element (a plain View) holds the width inside a flex row, while the
+   * inner card retains its natural intrinsic height. */
+  gridCellDesktop: {
+    width: "32%",
+  },
+  gridCellTrust: {
+    width: "23.5%",
   },
 });
